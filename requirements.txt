@@ -1,0 +1,6 @@
+openai
+jinja2
+pydantic
+boto3
+instructor
+redis

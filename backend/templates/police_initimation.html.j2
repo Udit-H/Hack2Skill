@@ -1,0 +1,41 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <style>
+        body { font-family: "Times New Roman", Times, serif; margin: 40px; line-height: 1.6; }
+        .header { text-align: center; font-weight: bold; text-decoration: underline; margin-bottom: 20px; }
+        .address { margin-bottom: 20px; }
+        .subject { font-weight: bold; margin-bottom: 20px; }
+    </style>
+</head>
+<body>
+    <div class="address">
+        <strong>Date:</strong> {{ date_of_draft }}<br><br>
+        <strong>To,</strong><br>
+        The Station House Officer (SHO),<br>
+        {{ police_station_name }} Police Station,<br>
+        Bengaluru, Karnataka.
+    </div>
+
+    <div class="subject">
+        SUBJECT: Intimation of Wrongful Restraint and Illegal Lockout under Section 126(2) of the Bharatiya Nyaya Sanhita (BNS), 2023.
+    </div>
+
+    <div>
+        Respected Sir/Madam,<br><br>
+        I, <strong>{{ applicant_name }}</strong>, currently residing at <strong>{{ property_address }}</strong>, am submitting this written intimation regarding extreme harassment by my landlord, <strong>{{ opponent_name }}</strong>.
+        <br><br>
+        <strong>Incident Summary:</strong><br>
+        {{ draft_body_summary }}
+        <br><br>
+        I have provided proof of my legal tenancy (Agreement/Payment Receipts) to substantiate my lawful possession of the premises. The actions of the landlord constitute an immediate threat to my life and liberty, severely restricting my fundamental right to access my own residence.
+        <br><br>
+        This is not a plea to settle a civil rent dispute, but an urgent intimation of criminal wrongful restraint. I request you to intervene, ensure my physical safety, and restore my access to the premises immediately.
+        <br><br>
+        Sincerely,<br><br><br>
+        ___________________________<br>
+        <strong>{{ applicant_name }}</strong><br>
+        Contact: {{ applicant_phone }}
+    </div>
+</body>
+</html>

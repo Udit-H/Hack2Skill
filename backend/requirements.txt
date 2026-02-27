@@ -1,0 +1,43 @@
+# Web Framework
+Flask==3.0.0
+Flask-CORS==4.0.0
+python-dotenv==1.0.0
+
+# LLM and AI
+#ollama==0.0.48
+#angchain==0.1.4
+#langchain-community==0.0.10
+#transformers==4.35.2
+
+# Document Processing and OCR
+pytesseract==0.3.10
+pdf2image==1.16.3
+Pillow==10.1.0
+opencv-python==4.8.1.78
+
+# Data Processing
+numpy==1.24.3
+pandas==2.1.1
+
+# Database and Storage
+sqlalchemy==2.0.23
+cryptography==41.0.7
+
+# Testing
+pytest==7.4.3
+pytest-cov==4.1.0
+hypothesis==6.88.1
+
+# Utilities
+requests==2.31.0
+python-dateutil==2.8.2
+pydantic==2.5.0
+aiohttp==3.9.1
+
+# Logging and Monitoring
+python-logging-loki==0.3.2
+
+# Code Quality
+black==23.12.0
+flake8==6.1.0
+pylint==3.0.3

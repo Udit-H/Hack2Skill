@@ -119,12 +119,15 @@ body {
   color: var(--text-primary);
   line-height: 1.6;
   min-height: 100vh;
-  overflow: hidden;
+  overflow-x: hidden;
+  overflow-y: auto;
+  margin: 0;
+  padding: 0;
 }
 
 #root {
   min-height: 100vh;
-  display: flex;
+  width: 100%;
 }
 
 /* --- Scrollbar --- */
@@ -409,6 +412,33 @@ body {
 .upload-btn:hover {
   background: rgba(20, 184, 166, 0.25);
   border-color: var(--primary-400);
+}
+
+/* Logout Button */
+.btn-logout {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  padding: var(--space-2) var(--space-4);
+  background: transparent;
+  border: 1px solid rgba(94, 234, 212, 0.2);
+  border-radius: var(--radius-full);
+  color: var(--text-secondary);
+  font-size: var(--font-size-sm);
+  font-weight: 500;
+  font-family: var(--font-sans);
+  cursor: pointer;
+  transition: all var(--transition-fast);
+}
+
+.btn-logout:hover {
+  background: rgba(20, 184, 166, 0.1);
+  border-color: var(--primary-400);
+  color: var(--primary-400);
+}
+
+.btn-logout:active {
+  transform: scale(0.97);
 }
 
 /* --- Messages --- */

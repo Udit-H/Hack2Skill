@@ -1,79 +1,34 @@
-import { useCallback } from 'react';
-import Sidebar from './components/Sidebar';
-import ChatWindow from './components/ChatWindow';
-import InputBar from './components/InputBar';
-import PanicButton from './components/PanicButton';
-import { useChat } from './hooks/useChat';
-import { panicWipe } from './utils/api';
+import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
+import { AuthProvider } from './hooks/useAuth.jsx';
+import LandingPage from './components/LandingPage';
+import LoginPage from './components/LoginPage';
+import SignupPage from './components/SignupPage';
+import TermsOfService from './components/TermsOfService';
+import PrivacyPolicy from './components/PrivacyPolicy';
+import ChatApp from './components/ChatApp';
+import ProtectedRoute from './components/ProtectedRoute';
 
 export default function App() {
-  const { messages, sessionId, isLoading, error, agentInfo, send, upload, clearMessages } =
-    useChat();
-
-  const handlePanic = useCallback(async () => {
-    if (sessionId) {
-      try {
-        await panicWipe(sessionId);
-      } catch {
-        // Silently fail — we're leaving anyway
-      }
-    }
-    clearMessages();
-  }, [sessionId, clearMessages]);
-
-  const handleQuickAction = useCallback(
-    (text) => {
-      send(text);
-    },
-    [send]
-  );
-
   return (
-    <div className="app-container">
-      <Sidebar sessionId={sessionId} agentInfo={agentInfo} />
-
-      <main className="chat-area">
-        {/* Header */}
-        <div className="chat-header">
-          <div className="chat-header-info">
-            <div className="agent-avatar">⚖️</div>
-            <div>
-              <h2>Sahayak Legal Assistant</h2>
-              <div className="agent-status">
-                {isLoading ? 'Thinking...' : 'Ready to help'}
-              </div>
-            </div>
-          </div>
-
-          <div className="chat-header-actions">
-            <select className="lang-selector" defaultValue="en" aria-label="Language">
-              <option value="en">English</option>
-              <option value="hi">हिन्दी</option>
-              <option value="ta">தமிழ்</option>
-              <option value="bn">বাংলা</option>
-            </select>
-
-            <PanicButton onConfirm={handlePanic} />
-          </div>
-        </div>
-
-        {/* Messages */}
-        <ChatWindow
-          messages={messages}
-          isLoading={isLoading}
-          onQuickAction={handleQuickAction}
-        />
-
-        {/* Error toast */}
-        {error && <div className="toast">⚠️ {error}</div>}
-
-        {/* Input */}
-        <InputBar
-          onSend={send}
-          onUpload={upload}
-          isLoading={isLoading}
-        />
-      </main>
-    </div>
+    <BrowserRouter>
+      <AuthProvider>
+        <Routes>
+          <Route path="/" element={<LandingPage />} />
+          <Route path="/login" element={<LoginPage />} />
+          <Route path="/signup" element={<SignupPage />} />
+          <Route path="/terms" element={<TermsOfService />} />
+          <Route path="/privacy" element={<PrivacyPolicy />} />
+          <Route
+            path="/chat"
+            element={
+              <ProtectedRoute>
+                <ChatApp />
+              </ProtectedRoute>
+            }
+          />
+          <Route path="*" element={<Navigate to="/" replace />} />
+        </Routes>
+      </AuthProvider>
+    </BrowserRouter>
   );
 }

@@ -21,7 +21,7 @@ class LegalAgent:
         self.client = instructor.from_openai(AsyncOpenAI(
             api_key=settings.llm.api_key,
             base_url=settings.llm.base_url
-        ))
+        ), mode=instructor.Mode.JSON)
         
         self.ocr_service = DocumentIntelligenceService()
         # self.rag_service = RagFlowService()
@@ -41,11 +41,11 @@ class LegalAgent:
 
         # --- PHASE 1: DATA GATHERING (OCR & RAG) ---
         if document_path and not current_state.extracted_doc_data:
-            # ocr_result = await self.ocr_service.analyze(source=document_path)
-            # current_state.extracted_doc_data = str(ocr_result) 
-
-            # Mcok results
-            current_state.extracted_doc_data = "OCR_DONE"
+            try:
+                ocr_result = await self.ocr_service.analyze(source=document_path)
+                current_state.extracted_doc_data = ocr_result.get("content", "OCR returned no text.")
+            except Exception as e:
+                current_state.extracted_doc_data = f"OCR failed: {str(e)}"
 
         # Async RAG
         if not current_state.retrieved_legal_context:

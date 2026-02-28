@@ -1,6 +1,8 @@
 import { useState } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
 import { signInWithEmailAndPassword, signInAnonymously } from 'firebase/auth';
+import { useLanguage } from '../hooks/useLanguage.jsx';
+import { getTranslation } from '../utils/translations.js';
 import { auth } from '../utils/firebase';
 import './AuthPages.css';
 
@@ -9,7 +11,10 @@ export default function LoginPage() {
   const [password, setPassword] = useState('');
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
+  const { language, setLanguage } = useLanguage();
   const navigate = useNavigate();
+
+  const t = (key) => getTranslation(key, language);
 
   const handleLogin = async (e) => {
     e.preventDefault();
@@ -42,10 +47,19 @@ export default function LoginPage() {
 
   return (
     <div className="auth-container">
+      <div className="language-selector">
+        <select value={language} onChange={(e) => setLanguage(e.target.value)}>
+          <option value="en">English</option>
+          <option value="hi">हिन्दी (Hindi)</option>
+          <option value="ta">தமிழ் (Tamil)</option>
+          <option value="bn">বাংলা (Bengali)</option>
+        </select>
+      </div>
+
       <div className="auth-box">
         {/* Back Button */}
         <Link to="/" className="back-button">
-          ← Back to Home
+          {t('auth.back_to_home')}
         </Link>
 
         {/* Logo */}
@@ -57,13 +71,13 @@ export default function LoginPage() {
 
         {/* Login Form */}
         <form onSubmit={handleLogin} className="auth-form">
-          <h2>Welcome Back</h2>
-          <p className="auth-subtitle">Sign in to access your crisis support</p>
+          <h2>{t('auth.welcome_back')}</h2>
+          <p className="auth-subtitle">{t('auth.sign_in_desc')}</p>
 
           {error && <div className="error-message">{error}</div>}
 
           <div className="form-group">
-            <label htmlFor="email">Email Address</label>
+            <label htmlFor="email">{t('auth.email')}</label>
             <input
               id="email"
               type="email"
@@ -76,7 +90,7 @@ export default function LoginPage() {
           </div>
 
           <div className="form-group">
-            <label htmlFor="password">Password</label>
+            <label htmlFor="password">{t('auth.password')}</label>
             <input
               id="password"
               type="password"
@@ -86,10 +100,13 @@ export default function LoginPage() {
               required
               disabled={loading}
             />
+            <Link to="/forgot-password" className="forgot-password-link">
+              {t('auth.forgot_password')}
+            </Link>
           </div>
 
           <button type="submit" className="btn btn-primary btn-block" disabled={loading}>
-            {loading ? 'Signing In...' : 'Sign In'}
+            {loading ? t('auth.sending_email') : t('auth.sign_in_btn')}
           </button>
         </form>
 
@@ -104,32 +121,31 @@ export default function LoginPage() {
           className="btn btn-secondary btn-block"
           disabled={loading}
         >
-          {loading ? 'Connecting...' : 'Continue without Login'}
+          {loading ? 'Connecting...' : t('auth.continue_without_login')}
         </button>
 
         {/* Sign Up Link */}
         <p className="auth-switch">
-          Don't have an account?{' '}
+          {t('auth.dont_have_account')}{' '}
           <Link to="/signup" className="auth-link">
-            Sign up here
+            {t('auth.sign_up_here')}
           </Link>
         </p>
 
         {/* Help Text */}
         <div className="auth-help">
           <p>
-            In a crisis? Call <strong>emergency services</strong> or reach out to a
-            local support hotline immediately.
+            {t('auth.emergency_help')}
           </p>
         </div>
 
         {/* Terms & Privacy */}
         <div className="auth-terms">
           <p>
-            By continuing, you agree to our{' '}
-            <a href="/terms" target="_blank" rel="noopener noreferrer">Terms of Service</a>
-            {' '}and{' '}
-            <a href="/privacy" target="_blank" rel="noopener noreferrer">Privacy Policy</a>
+            {t('auth.by_continuing')}{' '}
+            <a href="/terms" target="_blank" rel="noopener noreferrer">{t('auth.terms_of_service')}</a>
+            {' '}{t('auth.and')}{' '}
+            <a href="/privacy" target="_blank" rel="noopener noreferrer">{t('auth.privacy_policy')}</a>
           </p>
         </div>
       </div>

@@ -1,6 +1,8 @@
 import { useState } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
 import { createUserWithEmailAndPassword } from 'firebase/auth';
+import { useLanguage } from '../hooks/useLanguage.jsx';
+import { getTranslation } from '../utils/translations.js';
 import { auth } from '../utils/firebase';
 import './AuthPages.css';
 
@@ -10,19 +12,22 @@ export default function SignupPage() {
   const [confirmPassword, setConfirmPassword] = useState('');
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
+  const { language, setLanguage } = useLanguage();
   const navigate = useNavigate();
+
+  const t = (key) => getTranslation(key, language);
 
   const validateForm = () => {
     if (!email || !password || !confirmPassword) {
-      setError('All fields are required');
+      setError(t('auth.all_fields_required'));
       return false;
     }
     if (password.length < 6) {
-      setError('Password must be at least 6 characters');
+      setError(t('auth.min_6_chars'));
       return false;
     }
     if (password !== confirmPassword) {
-      setError('Passwords do not match');
+      setError(t('auth.password_mismatch'));
       return false;
     }
     return true;
@@ -48,10 +53,19 @@ export default function SignupPage() {
 
   return (
     <div className="auth-container">
+      <div className="language-selector">
+        <select value={language} onChange={(e) => setLanguage(e.target.value)}>
+          <option value="en">English</option>
+          <option value="hi">हिन्दी (Hindi)</option>
+          <option value="ta">தமிழ் (Tamil)</option>
+          <option value="bn">বাংলা (Bengali)</option>
+        </select>
+      </div>
+
       <div className="auth-box">
         {/* Back Button */}
         <Link to="/" className="back-button">
-          ← Back to Home
+          {t('auth.back_to_home')}
         </Link>
 
         {/* Logo */}
@@ -63,13 +77,13 @@ export default function SignupPage() {
 
         {/* Signup Form */}
         <form onSubmit={handleSignup} className="auth-form">
-          <h2>Create Account</h2>
-          <p className="auth-subtitle">Join Sahayak to get support today</p>
+          <h2>{t('auth.create_account')}</h2>
+          <p className="auth-subtitle">{t('auth.signup_desc')}</p>
 
           {error && <div className="error-message">{error}</div>}
 
           <div className="form-group">
-            <label htmlFor="email">Email Address</label>
+            <label htmlFor="email">{t('auth.email')}</label>
             <input
               id="email"
               type="email"
@@ -82,7 +96,7 @@ export default function SignupPage() {
           </div>
 
           <div className="form-group">
-            <label htmlFor="password">Password</label>
+            <label htmlFor="password">{t('auth.password')}</label>
             <input
               id="password"
               type="password"
@@ -92,11 +106,11 @@ export default function SignupPage() {
               required
               disabled={loading}
             />
-            <small>At least 6 characters</small>
+            <small>{t('auth.password_min')}</small>
           </div>
 
           <div className="form-group">
-            <label htmlFor="confirmPassword">Confirm Password</label>
+            <label htmlFor="confirmPassword">{t('auth.confirm_password')}</label>
             <input
               id="confirmPassword"
               type="password"
@@ -111,21 +125,21 @@ export default function SignupPage() {
           <div className="terms-checkbox">
             <input type="checkbox" id="terms" required disabled={loading} />
             <label htmlFor="terms">
-              I agree to the <a href="/terms" target="_blank" rel="noopener noreferrer">Terms of Service</a> and{' '}
-              <a href="/privacy" target="_blank" rel="noopener noreferrer">Privacy Policy</a>
+              {t('auth.by_continuing')} <a href="/terms" target="_blank" rel="noopener noreferrer">{t('auth.terms_of_service')}</a> {t('auth.and')}{' '}
+              <a href="/privacy" target="_blank" rel="noopener noreferrer">{t('auth.privacy_policy')}</a>
             </label>
           </div>
 
           <button type="submit" className="btn btn-primary btn-block" disabled={loading}>
-            {loading ? 'Creating Account...' : 'Create Account'}
+            {loading ? t('auth.sending_email') : t('auth.create_account_btn')}
           </button>
         </form>
 
         {/* Login Link */}
         <p className="auth-switch">
-          Already have an account?{' '}
+          {t('auth.already_have_account')}{' '}
           <Link to="/login" className="auth-link">
-            Sign in here
+            {t('auth.sign_in_here')}
           </Link>
         </p>
 

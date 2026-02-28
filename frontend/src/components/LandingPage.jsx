@@ -1,9 +1,25 @@
 import { Link } from 'react-router-dom';
+import { useLanguage } from '../hooks/useLanguage.jsx';
+import { getTranslation } from '../utils/translations.js';
 import './LandingPage.css';
 
 export default function LandingPage() {
+  const { language, setLanguage } = useLanguage();
+
+  const t = (key) => getTranslation(key, language);
+
   return (
     <div className="landing-container">
+      {/* Language Selector in Top Right */}
+      <div className="language-selector-top">
+        <select value={language} onChange={(e) => setLanguage(e.target.value)}>
+          <option value="en">English</option>
+          <option value="hi">हिन्दी (Hindi)</option>
+          <option value="ta">தமிழ் (Tamil)</option>
+          <option value="bn">বাংলা (Bengali)</option>
+        </select>
+      </div>
+
       {/* Navigation */}
       <nav className="landing-nav">
         <div className="nav-content">
@@ -12,9 +28,9 @@ export default function LandingPage() {
             <span className="logo-text">Sahayak</span>
           </div>
           <div className="nav-links">
-            <a href="#features">Features</a>
-            <a href="#about">About</a>
-            <a href="#contact">Contact</a>
+            <a href="#features">{t('landing.features')}</a>
+            <a href="#about">{t('landing.about')}</a>
+            <a href="#contact">{t('landing.contact')}</a>
           </div>
         </div>
       </nav>
@@ -23,20 +39,19 @@ export default function LandingPage() {
       <section className="hero-section">
         <div className="hero-content">
           <h1 className="hero-title">
-            Justice for All
-            <span className="gradient-text"> Last Mile</span>
+            {t('landing.hero_title')}
+            <span className="gradient-text"> {t('landing.hero_subtitle_accent')}</span>
           </h1>
           <p className="hero-subtitle">
-            Emergency legal assistance and shelter support when you need it most.
-            Trauma-informed guidance through your crisis.
+            {t('landing.hero_description')}
           </p>
 
           <div className="hero-cta">
             <Link to="/login" className="btn btn-primary">
-              Login
+              {t('auth.login')}
             </Link>
             <Link to="/signup" className="btn btn-secondary">
-              Sign Up
+              {t('auth.sign_up')}
             </Link>
           </div>
 
@@ -52,66 +67,62 @@ export default function LandingPage() {
 
       {/* Features Section */}
       <section id="features" className="features-section">
-        <h2>How Sahayak Helps You</h2>
+        <h2>{t('landing.how_sahayak_helps')}</h2>
         
         <div className="features-grid">
           {/* Shelter Assistance */}
           <div className="feature-card">
             <div className="feature-icon">🏠</div>
-            <h3>Emergency Shelter</h3>
+            <h3>{t('landing.shelter_assistance')}</h3>
             <p>
-              Find safe, verified shelters near you instantly. Get immediate assistance
-              if you're facing homelessness or unsafe living conditions.
+              {t('landing.shelter_description')}
             </p>
             <ul className="feature-list">
-              <li>Real-time shelter availability</li>
-              <li>Trauma-informed support</li>
-              <li>SMS notifications to managers</li>
+              <li>{t('landing.shelter_feature_1')}</li>
+              <li>{t('landing.shelter_feature_2')}</li>
+              <li>{t('landing.shelter_feature_3')}</li>
             </ul>
           </div>
 
           {/* Legal Assistance */}
           <div className="feature-card">
             <div className="feature-icon">⚖️</div>
-            <h3>Legal Support</h3>
+            <h3>{t('landing.legal_support')}</h3>
             <p>
-              Access affordable legal help for property disputes, evictions, and other
-              civil matters. Document processing made simple.
+              {t('landing.legal_description')}
             </p>
             <ul className="feature-list">
-              <li>AI-powered document analysis</li>
-              <li>Legal form generation</li>
-              <li>Expert guidance</li>
+              <li>{t('landing.legal_feature_1')}</li>
+              <li>{t('landing.legal_feature_2')}</li>
+              <li>{t('landing.legal_feature_3')}</li>
             </ul>
           </div>
 
           {/* 24/7 Availability */}
           <div className="feature-card">
             <div className="feature-icon">⏰</div>
-            <h3>24/7 Support</h3>
+            <h3>{t('landing.support_24_7')}</h3>
             <p>
-              Crisis doesn't follow business hours. Our AI assistant is available
-              anytime to help you navigate your situation.
+              {t('landing.support_description')}
             </p>
             <ul className="feature-list">
-              <li>Always available</li>
-              <li>Instant responses</li>
-              <li>Multi-language support</li>
+              <li>{t('landing.support_feature_1')}</li>
+              <li>{t('landing.support_feature_2')}</li>
+              <li>{t('landing.support_feature_3')}</li>
             </ul>
           </div>
 
           {/* Privacy & Safety */}
           <div className="feature-card">
             <div className="feature-icon">🔒</div>
-            <h3>Privacy & Safety</h3>
+            <h3>{t('landing.privacy_safety')}</h3>
             <p>
-              Your data and identity are protected. We never share your information
-              without consent.
+              {t('landing.privacy_description')}
             </p>
             <ul className="feature-list">
-              <li>End-to-end encryption</li>
-              <li>GDPR compliant</li>
-              <li>Anonymous options</li>
+              <li>{t('landing.privacy_feature_1')}</li>
+              <li>{t('landing.privacy_feature_2')}</li>
+              <li>{t('landing.privacy_feature_3')}</li>
             </ul>
           </div>
         </div>
@@ -120,11 +131,9 @@ export default function LandingPage() {
       {/* About Section */}
       <section id="about" className="about-section">
         <div className="about-content">
-          <h2>About Sahayak</h2>
+          <h2>{t('landing.about_sahayak')}</h2>
           <p className="about-text">
-            Sahayak is an AI-powered crisis management platform designed to provide
-            immediate, trauma-informed assistance to vulnerable populations. Whether
-            you're facing homelessness, legal disputes, or need emergency shelter,
+            {t('landing.about_description')}
             Sahayak connects you with resources and legal guidance.
           </p>
           
@@ -134,16 +143,16 @@ export default function LandingPage() {
               <p>Always Available</p>
             </div>
             <div className="stat">
-              <h4>Free</h4>
-              <p>No Cost</p>
+              <h4>{t('landing.stat_free')}</h4>
+              <p>{t('landing.stat_free_desc')}</p>
             </div>
             <div className="stat">
-              <h4>Safe</h4>
-              <p>Verified Resources</p>
+              <h4>{t('landing.stat_safe')}</h4>
+              <p>{t('landing.stat_safe_desc')}</p>
             </div>
             <div className="stat">
-              <h4>Quick</h4>
-              <p>Instant Help</p>
+              <h4>{t('landing.stat_quick')}</h4>
+              <p>{t('landing.stat_quick_desc')}</p>
             </div>
           </div>
         </div>
@@ -151,14 +160,14 @@ export default function LandingPage() {
 
       {/* CTA Section */}
       <section className="cta-section">
-        <h2>Ready to Get Help?</h2>
-        <p>Join thousands who have found assistance through Sahayak.</p>
+        <h2>{t('landing.ready_help')}</h2>
+        <p>{t('landing.join_thousands')}</p>
         <div className="cta-buttons">
           <Link to="/signup" className="btn btn-primary btn-large">
-            Create Account Now
+            {t('landing.create_account_now')}
           </Link>
           <Link to="/login" className="btn btn-secondary btn-large">
-            Already a Member? Login
+            {t('landing.already_member')}
           </Link>
         </div>
       </section>

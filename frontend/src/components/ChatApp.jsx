@@ -1,5 +1,7 @@
 import { useCallback } from 'react';
 import { useAuth } from '../hooks/useAuth.jsx';
+import { useLanguage } from '../hooks/useLanguage.jsx';
+import { getTranslation } from '../utils/translations.js';
 import { useNavigate } from 'react-router-dom';
 import Sidebar from './Sidebar';
 import ChatWindow from './ChatWindow';
@@ -10,9 +12,12 @@ import { panicWipe } from '../utils/api';
 
 export default function ChatApp() {
   const { user, logout } = useAuth();
+  const { language, setLanguage } = useLanguage();
   const navigate = useNavigate();
   const { messages, sessionId, isLoading, error, agentInfo, send, upload, clearMessages } =
     useChat();
+
+  const t = (key) => getTranslation(key, language);
 
   // Redirect if not authenticated
   if (!user) {
@@ -53,15 +58,20 @@ export default function ChatApp() {
           <div className="chat-header-info">
             <div className="agent-avatar">⚖️</div>
             <div>
-              <h2>Sahayak Legal Assistant</h2>
+              <h2>{t('chat.legal_assistant')}</h2>
               <div className="agent-status">
-                {isLoading ? 'Thinking...' : 'Ready to help'}
+                {isLoading ? t('chat.thinking') : t('chat.ready_help')}
               </div>
             </div>
           </div>
 
           <div className="chat-header-actions">
-            <select className="lang-selector" defaultValue="en" aria-label="Language">
+            <select 
+              className="lang-selector" 
+              value={language}
+              onChange={(e) => setLanguage(e.target.value)}
+              aria-label="Language"
+            >
               <option value="en">English</option>
               <option value="hi">हिन्दी</option>
               <option value="ta">தமிழ்</option>
@@ -75,7 +85,7 @@ export default function ChatApp() {
               className="btn-logout"
               title="Logout"
             >
-              🚪 Logout
+              🚪 {t('auth.logout')}
             </button>
           </div>
         </div>

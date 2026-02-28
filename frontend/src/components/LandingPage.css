@@ -13,6 +13,36 @@
   position: relative;
 }
 
+/* Language Selector */
+.language-selector-top {
+  position: fixed;
+  top: 20px;
+  right: 20px;
+  z-index: 200;
+}
+
+.language-selector-top select {
+  padding: 0.5rem 0.75rem;
+  background: var(--bg-secondary);
+  color: var(--text-primary);
+  border: 1px solid var(--primary-400);
+  border-radius: 4px;
+  font-size: 0.9rem;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.language-selector-top select:hover {
+  background: var(--primary-900);
+  border-color: var(--primary-300);
+}
+
+.language-selector-top select:focus {
+  outline: none;
+  border-color: var(--primary-300);
+  box-shadow: 0 0 0 3px rgba(20, 184, 166, 0.1);
+}
+
 /* Header / Navigation */
 .landing-nav {
   width: 100%;

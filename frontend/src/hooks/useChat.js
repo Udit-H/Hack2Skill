@@ -1,11 +1,13 @@
 import { useState, useCallback, useRef, useEffect } from 'react';
 import { createSession, sendMessage, uploadDocument } from '../utils/api';
+import { useLanguage } from './useLanguage.jsx';
 
 export function useChat() {
     const [messages, setMessages] = useState([]);
     const [sessionId, setSessionId] = useState(null);
     const [isLoading, setIsLoading] = useState(false);
     const [error, setError] = useState(null);
+    const { language } = useLanguage();
     const [agentInfo, setAgentInfo] = useState({
         activeAgent: 'legal',
         workflowStatus: 'awaiting_docs',
@@ -43,7 +45,7 @@ export function useChat() {
             setIsLoading(true);
 
             try {
-                const response = await sendMessage(sessionId, text);
+                const response = await sendMessage(sessionId, text, language);
 
                 const assistantMsg = {
                     id: Date.now() + 1,
@@ -63,7 +65,7 @@ export function useChat() {
                 setIsLoading(false);
             }
         },
-        [sessionId, isLoading]
+        [sessionId, isLoading, language]
     );
 
     const upload = useCallback(

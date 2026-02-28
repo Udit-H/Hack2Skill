@@ -98,6 +98,7 @@ app.add_middleware(
 class ChatRequest(BaseModel):
     session_id: str
     message: str
+    language: str = "en"
 
 
 class ChatResponse(BaseModel):
@@ -166,6 +167,7 @@ async def chat(req: ChatRequest):
                 session=state,
                 user_message=req.message,
                 memory_manager=memory,
+                language=req.language,
             )
 
             reply = response.reply_message or "I'm processing your request."

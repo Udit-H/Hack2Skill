@@ -40,12 +40,14 @@ class LegalAgent:
         """
 
         # --- PHASE 1: DATA GATHERING (OCR & RAG) ---
-        if document_path and not current_state.extracted_doc_data:
+        if document_path and (not current_state.extracted_doc_data or current_state.extracted_doc_data.startswith("OCR failed")):
             try:
                 ocr_result = await self.ocr_service.analyze(source=document_path)
                 current_state.extracted_doc_data = ocr_result.get("content", "OCR returned no text.")
+                print(f"✅ OCR succeeded: {len(current_state.extracted_doc_data)} chars extracted")
             except Exception as e:
                 current_state.extracted_doc_data = f"OCR failed: {str(e)}"
+                print(f"❌ OCR failed: {e}")
 
         # Async RAG
         if not current_state.retrieved_legal_context:

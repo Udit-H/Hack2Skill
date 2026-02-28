@@ -29,7 +29,7 @@ class Orchestrator:
         # 2. EMERGENCY OVERRIDE CHECK (The Wow Factor)
         if session.active_agent == AgentType.LEGAL and self._is_emergency_override(message):
             session.active_agent = AgentType.SHELTER
-            await send_whatsapp(user_id, "I am pausing the legal work. Activating emergency shelter protocols.")
+            await send_notification(user_id, "I am pausing the legal work. Activating emergency shelter protocols.")
 
         # 3. ROUTE TO ACTIVE AGENT
         agent_response = None
@@ -54,7 +54,7 @@ class Orchestrator:
         """Executes whatever the Agent told the Orchestrator to do."""
         
         if response.action_type == AgentActionType.REPLY_TO_USER:
-            await send_whatsapp(user_id, response.reply_message)
+            await send_notification(user_id, response.reply_message)
             
         elif response.action_type == AgentActionType.SWITCH_AGENT:
             # e.g., Legal Agent finished. Orchestrator takes over to see what's next.
@@ -72,18 +72,18 @@ class Orchestrator:
             session.active_agent = AgentType.LEGAL
             # Initialize empty legal state
             session.legal = LegalAgentState(workflow_status="awaiting_docs", drafts_to_generate=[])
-            await send_whatsapp(user_id, "Let's prepare your legal defense. Please upload your rent agreement or eviction notice.")
+            await send_notification(user_id, "Let's prepare your legal defense. Please upload your rent agreement or eviction notice.")
 
         # Scenario 2: Legal finished. Do they need a shelter?
         elif session.triage and session.triage.needs_immediate_shelter and not session.shelter:
             session.active_agent = AgentType.SHELTER
             session.shelter = ShelterAgentState(workflow_status="awaiting_consent")
-            await send_whatsapp(user_id, "Your legal documents are ready. However, you indicated you are locked out. Do I have your consent to locate a nearby emergency shelter and send an application to the manager?")
+            await send_notification(user_id, "Your legal documents are ready. However, you indicated you are locked out. Do I have your consent to locate a nearby emergency shelter and send an application to the manager?")
             
         # Scenario 3: Everything is done.
         else:
             session.active_agent = AgentType.COMPLETED
-            await send_whatsapp(user_id, "All operations completed. Stay safe, and type 'Hi' if you need more help.")
+            await send_notification(user_id, "All operations completed. Stay safe, and type 'Hi' if you need more help.")
 
     def _is_emergency_override(self, message: str) -> bool:
         """Fast regex/keyword check to interrupt agents."""

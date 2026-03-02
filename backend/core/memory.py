@@ -20,20 +20,17 @@ template_env = jinja2.Environment(loader=jinja2.FileSystemLoader(searchpath=prom
 
 class MemoryManager:
     def __init__(self, session_id: str = None):
-        self.settings = Settings()
-        # self.session_id = session_id
-        self.session_id = "abcd-1234"
+        settings = Settings()
+        self.session_id = session_id
         
         self.redis_client = redis.Redis(
-            host='redis-14324.c15.us-east-1-4.ec2.cloud.redislabs.com',
-            port=14324,
+            host=settings.redisdb.host,
+            port=settings.redisdb.port,
             decode_responses=True,
             username="default",
-            password="8MpHv6o4C1nffvl2jMu060SMI9usS7Yr",
+            password=settings.redisdb.password,
         )
-        
-        settings = get_settings()
-        
+                
         self.llm_client = AsyncOpenAI(
             api_key=settings.llm.api_key,
             base_url=settings.llm.base_url

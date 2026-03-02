@@ -1,26 +1,30 @@
 from pydantic import BaseModel, Field
-from typing import Optional, List
-from models.enums import CrisisCategory
+from typing import Optional
+from enum import Enum
+from models.enums import CrisisCategory # Assuming you have this (e.g., ILLEGAL_EVICTION, DOMESTIC_VIOLENCE)
+
+class TriageWorkflowStatus(str, Enum):
+    GREETING = "greeting"                       # Explaining the app, asking what happened
+    GATHERING_FACTS = "gathering_facts"         # Figuring out ownership/financial status
+    ASSESSING_NEEDS = "assessing_needs"         # Asking explicitly for Shelter and Legal intent
+    COMPLETED = "completed"                     # Profiling done, ready to hand off
 
 class TriageState(BaseModel):
-    category: CrisisCategory = Field(description="Categorize the crisis.")
-    urgency_level: int = Field(description="1 to 5 scale. 5 means imminent physical danger or currently on the street.")
+    workflow_status: TriageWorkflowStatus = Field(default=TriageWorkflowStatus.GREETING)
+    
+    category: Optional[CrisisCategory] = Field(None, description="The broad category of the crisis.")
+    urgency_level: Optional[int] = Field(None, description="Scale of 1-5. 5 means physically locked out/in danger.")
+    incident_summary: Optional[str] = Field(None, description="A 2-sentence summary of who the user is and what happened.")
     
     victim_name: Optional[str] = Field(None, description="Name of the person in distress")
     aggressor_name: Optional[str] = Field(None, description="Name of landlord, abusive spouse, or abusive child. Leave Null for Natural Disasters.")
-    
-    # Universal Triggers for Track B (Shelter)
-    needs_immediate_shelter: bool = Field(description="True if the user has no safe place to sleep tonight (Evicted, Flooded, or Fleeing Abuse).")
-    physical_danger_present: bool = Field(description="True if there is active violence, threats, or severe disaster conditions.")
-    
-    # Case-Specific Flags (LLM sets to True only if explicitly mentioned)
-    incident_summary: str = Field(description="A 1-2 sentence factual summary of the user's situation.")
     property_address: Optional[str] = Field(None, description="Address of the disputed or unsafe property.")
-    
-    has_ownership_claim: Optional[bool] = Field(default=None, description="True if the user claims they own the property (Crucial for Senior Citizen case).")
-    is_financially_destitute: Optional[bool] = Field(default=None, description="True if user explicitly states they have no money to pay rent/fees (Crucial for Case 5 - NALSA Aid).")
 
-    missing_info: List[str] = Field(
-        default_factory=list,
-        description="List of questions to ask to complete this profile based on the category. Keep empty if ready."
-    )
+    eviction_reason: Optional[str] = Field(None, description="Why did the landlord/family kick them out?")
+    has_ownership_claim: Optional[bool] = Field(None, description="Does the user claim to legally own the property?")
+    is_financially_destitute: Optional[bool] = Field(None, description="Are they unable to afford a lawyer/rent?")
+    
+    needs_immediate_shelter: Optional[bool] = Field(None, description="True if they want us to find a shelter.")
+    needs_legal_action: Optional[bool] = Field(None, description="True if they consent to drafting legal documents/police intimations.")
+    
+    next_question_for_user: Optional[str] = Field(None, description="The exact message to reply to the user.")

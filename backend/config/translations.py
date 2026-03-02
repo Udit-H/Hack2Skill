@@ -9,7 +9,7 @@ AGENT_RESPONSES = {
         "awaiting_docs": "Please upload a clear photo of your rent agreement, eviction notice, or ID card so I can extract your details automatically.",
         "awaiting_user_info": "What is your current situation regarding the eviction? Please describe the details.",
         "awaiting_consent": "Filing a Police Intimation can escalate matters. Do I have your explicit permission to draft an intimation to the Delhi SHO regarding Wrongful Restraint?",
-        "ready_to_draft": "I have successfully mapped your data to the official Delhi legal forms. The system will now generate your documents.",
+        "ready_to_draft": "I have successfully mapped your data to the official Bengaluru legal forms. The system will now generate your documents.",
         "default": "I'm here to help with your legal situation. Please tell me more about what you're experiencing.",
     },
     "hi": {

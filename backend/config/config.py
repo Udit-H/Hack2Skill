@@ -18,11 +18,17 @@ class RedisDbSettings(BaseSettings):
     host: Optional[str] = os.getenv("REDIS_HOST", "localhost")
     password: Optional[str] = os.getenv("REDIS_PASSWORD", "")
     db_name: Optional[str] = os.getenv("REDIS_DB_NAME", "0")
+    port: Optional[int] = os.getenv("REDIS_PORT", 14324)
 
+class SupabaseDbSettings(BaseSettings):
+    url: str = os.getenv("SUPABASE_URL")
+    pub_key: str = os.getenv("SUPABASE_PUB_KEY")
+    service_key: str = os.getenv("SUPABASE_ANON_KEY")
 class Settings(BaseSettings):
     document_intelligence: DocumentIntelligenceSettings = DocumentIntelligenceSettings()
     llm: LLMSettings = LLMSettings()
     redisdb: RedisDbSettings = RedisDbSettings()
+    supabase: SupabaseDbSettings = SupabaseDbSettings()
 
 
 @lru_cache

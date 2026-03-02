@@ -5,10 +5,10 @@ from openai import AsyncOpenAI
 
 from config.config import get_settings
 from config.translations import get_translated_response
-from models.legal import LegalAgentState, DraftType, LegalDraftPayload, WorkflowStatus
+from models.legal import LegalAgentState, WorkflowStatus
 from models.triage import TriageState
 from models.session import SessionState, AgentResponse, AgentActionType, AgentType # FIX: Added Global States
-from core.rag_service import RagFlowService
+# from core.rag_service import RagFlowService
 from core.ocr_service import DocumentIntelligenceService 
 
 # Remove this line later
@@ -51,10 +51,10 @@ class LegalAgent:
 
         # Async RAG
         if not current_state.retrieved_legal_context:
-            rag_query = f"Delhi laws regarding {triage.category.value}: {triage.incident_summary}"
+            rag_query = f"Laws regarding {triage.category.value}: {triage.incident_summary}"
             # current_state.retrieved_legal_context = await self.rag_service.fetch_legal_context(rag_query)
             # Mocking RAG for now
-            current_state.retrieved_legal_context = "Delhi Rent Control Act applies. Police Intimation under BNS 126 for wrongful restraint."
+            current_state.retrieved_legal_context = "Bengaluru Rent Control Act applies. Police Intimation under BNS 126 for wrongful restraint."
 
         template = self.template_env.get_template("legal_agent_system.j2")
         state_json = current_state.model_dump_json(exclude={"extracted_doc_data", "retrieved_legal_context"})
@@ -69,33 +69,18 @@ class LegalAgent:
     
     async def process_turn(
         self, 
-        session: SessionState,  # FIX: Take the master SessionState 
+        session: SessionState,  
         user_message: str = None, 
         document_path: str = None,
         memory_manager = None,
         language: str = "en",
-    ) -> AgentResponse: # FIX: Return Orchestrator instruction
+    ) -> AgentResponse: 
         """
         The main asynchronous entry point. Orchestrates the workflow.
         """
 
         triage = session.triage
         current_state = session.legal
-#         memory_context = memory_manager.get_memory_context()
-
-#         system_prompt = await self.get_legal_system_prompt(triage, current_state, document_path)
-#         updated_state: LegalAgentState = await self.client.chat.completions.create(
-#             model="gemini-2.5-flash", 
-#             response_model=LegalAgentState,
-#             messages=[
-#                 {"role": "system", "content": system_prompt},
-# # ---------------------------------
-# # remove the below line later
-# # ---------------------------------
-#                 {"role": "user", "content":memory_context + "\n use this memory context to gain idea about the current interaction"},
-#                 {"role": "user", "content": user_message or "Evaluate the state and dictate the next workflow step."}
-#             ]
-#         )
 
         memory_context = memory_manager.get_memory_context()
 
@@ -145,16 +130,3 @@ class LegalAgent:
             response.reply_message = "I'm here to help with your legal situation. Please tell me more about what you're experiencing."
 
         return response
-
-    def generate_pdf_from_jinja(self, draft: LegalDraftPayload) -> str:
-        """
-        Mock function. In reality, you will load an HTML Jinja template, 
-        inject the 'draft' fields into it, and compile via pdfkit/weasyprint.
-        """        
-        # Example Implementation:
-        # template = self.template_env.get_template(f"{draft.draft_type.value}.html.j2")
-        # html_out = template.render(draft.dict())
-        # pdf_path = f"/downloads/{draft.applicant_name}_{draft.draft_type.value}.pdf"
-        # pdfkit.from_string(html_out, pdf_path)
-        
-        return f"/downloads/{draft.applicant_name}_{draft.draft_type.value}.pdf"

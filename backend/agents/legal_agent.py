@@ -8,7 +8,7 @@ from config.translations import get_translated_response
 from models.legal import LegalAgentState, WorkflowStatus
 from models.triage import TriageState
 from models.session import SessionState, AgentResponse, AgentActionType, AgentType # FIX: Added Global States
-# from core.rag_service import RagFlowService
+from core.rag_service import RAGService
 from core.ocr_service import DocumentIntelligenceService 
 
 # Remove this line later
@@ -24,7 +24,7 @@ class LegalAgent:
         ), mode=instructor.Mode.JSON)
         
         self.ocr_service = DocumentIntelligenceService()
-        # self.rag_service = RagFlowService()
+        self.rag_service = RAGService()
         
         prompt_dir = os.path.join(os.path.dirname(__file__), '..', 'prompts')
         self.template_env = jinja2.Environment(loader=jinja2.FileSystemLoader(searchpath=prompt_dir))
@@ -52,9 +52,10 @@ class LegalAgent:
         # Async RAG
         if not current_state.retrieved_legal_context:
             rag_query = f"Laws regarding {triage.category.value}: {triage.incident_summary}"
-            # current_state.retrieved_legal_context = await self.rag_service.fetch_legal_context(rag_query)
+            response = await self.rag_service.search(rag_query)
+            current_state.retrieved_legal_context = response.answer
             # Mocking RAG for now
-            current_state.retrieved_legal_context = "Bengaluru Rent Control Act applies. Police Intimation under BNS 126 for wrongful restraint."
+            # current_state.retrieved_legal_context = "Bengaluru Rent Control Act applies. Police Intimation under BNS 126 for wrongful restraint."
 
         template = self.template_env.get_template("legal_agent_system.j2")
         state_json = current_state.model_dump_json(exclude={"extracted_doc_data", "retrieved_legal_context"})

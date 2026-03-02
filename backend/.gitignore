@@ -77,6 +77,6 @@ package-lock.json
 *.swo
 *~
 .vscode/settings.json
-test_cli.py
+# test_cli.py
 # test_shelter_cli.py
-supabase_test.py
+# supabase_test.py

@@ -1,14 +1,13 @@
 import os
 import asyncio
 import redis
+import boto3
 # from mem0 import MemoryClient
-import instructor
-from openai import AsyncOpenAI
 import jinja2
 
 from config.config import Settings
-
 from config.config import get_settings
+from core.bedrock_client import BedrockAsyncClient
 
 WORKING_MEMORY_TURNS = 6
 SUMMARIZATION_THRESHOLD = WORKING_MEMORY_TURNS * 2
@@ -34,10 +33,14 @@ class MemoryManager:
         
         settings = get_settings()
         
-        self.llm_client = AsyncOpenAI(
-            api_key=settings.llm.api_key,
-            base_url=settings.llm.base_url
-        )
+        # Initialize Bedrock client for text generation
+        boto_kwargs = {"region_name": settings.llm.aws_region}
+        if settings.llm.aws_access_key_id and settings.llm.aws_secret_access_key:
+            boto_kwargs["aws_access_key_id"] = settings.llm.aws_access_key_id
+            boto_kwargs["aws_secret_access_key"] = settings.llm.aws_secret_access_key
+        
+        bedrock_runtime = boto3.client("bedrock-runtime", **boto_kwargs)
+        self.llm_client = BedrockAsyncClient(bedrock_runtime, settings.llm.model_id)
         
         self.template = template_env.get_template("memory.j2")
 
@@ -99,9 +102,8 @@ class MemoryManager:
         )
         
         try:
-            # Assuming your LLMFactory has an async method. If not, run it in an executor.
+            # Bedrock async call for summarization
             response = await self.llm_client.chat.completions.create(
-                model="gemini-2.5-flash", 
                 messages=[
                     {"role": "system", "content": prompt},
                     {"role": "user", "content": "Give me an updated summary using all the relevant context given in the system prompt"}

@@ -60,7 +60,7 @@ def get_or_create_session(session_id: str) -> dict:
                 is_financially_destitute=False,
             ),
             legal=LegalAgentState(
-                workflow_status=WorkflowStatus.AWAITING_USER_INFO,
+                workflow_status=WorkflowStatus.AWAITING_DOCS,
                 drafts_to_generate=[],
             ),
         )

@@ -12,7 +12,7 @@ python-dotenv==1.2.1
 # LLM
 openai==2.24.0
 instructor==1.14.5
-google-genai==0.4.0
+google-genai==0.4.0  # Legacy Gemini support
 
 # Templates
 jinja2==3.1.6
@@ -20,7 +20,7 @@ jinja2==3.1.6
 # Memory (Redis)
 redis==7.2.1
 
-# AWS (Textract OCR + S3)
+# AWS (Bedrock LLM, Textract OCR, S3 Storage)
 boto3==1.42.59
 
 # Async HTTP & File I/O

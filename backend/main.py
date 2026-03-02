@@ -207,6 +207,50 @@ async def upload_document(
     session_id: str = Form(...),
 ):
     """Upload a document for OCR processing."""
+    
+    # Define allowed file types and their max sizes (in bytes)
+    MAX_IMAGE_SIZE = 10 * 1024 * 1024  # 10MB
+    MAX_PDF_SIZE = 15 * 1024 * 1024    # 15MB
+    ALLOWED_EXTENSIONS = {".pdf", ".jpg", ".jpeg", ".png", ".tiff", ".tif"}
+    ALLOWED_MIME_TYPES = {
+        "application/pdf",
+        "image/jpeg",
+        "image/png",
+        "image/tiff",
+    }
+    
+    # Validate file extension
+    file_name_lower = file.filename.lower()
+    file_extension = "." + file_name_lower.split(".")[-1] if "." in file_name_lower else ""
+    
+    if file_extension not in ALLOWED_EXTENSIONS:
+        raise HTTPException(
+            status_code=400,
+            detail=f"Invalid file type '{file_extension}'. Only PDF, JPG, PNG, and TIFF files are allowed."
+        )
+    
+    # Validate file MIME type
+    if file.content_type and file.content_type not in ALLOWED_MIME_TYPES:
+        raise HTTPException(
+            status_code=400,
+            detail=f"Invalid MIME type '{file.content_type}'. Only image and PDF files are allowed."
+        )
+    
+    # Read file and validate size
+    contents = await file.read()
+    file_size = len(contents)
+    
+    is_pdf = file_extension == ".pdf"
+    max_size = MAX_PDF_SIZE if is_pdf else MAX_IMAGE_SIZE
+    max_size_mb = 15 if is_pdf else 10
+    
+    if file_size > max_size:
+        file_size_mb = file_size / (1024 * 1024)
+        raise HTTPException(
+            status_code=413,
+            detail=f"File too large. {'PDFs' if is_pdf else 'Images'} must be under {max_size_mb}MB. Your file is {file_size_mb:.1f}MB."
+        )
+    
     sess = get_or_create_session(session_id)
     state = sess["state"]
     memory = sess["memory"]
@@ -217,7 +261,6 @@ async def upload_document(
     os.makedirs(upload_dir, exist_ok=True)
     file_path = os.path.join(upload_dir, f"{session_id}_{file.filename}")
 
-    contents = await file.read()
     with open(file_path, "wb") as f:
         f.write(contents)
 

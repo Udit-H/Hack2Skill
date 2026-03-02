@@ -72,6 +72,31 @@ export function useChat() {
         async (file) => {
             if (!file || isLoading) return;
             setError(null);
+
+            // File validation
+            const MAX_IMAGE_SIZE = 10 * 1024 * 1024; // 10MB
+            const MAX_PDF_SIZE = 15 * 1024 * 1024;   // 15MB
+            const ALLOWED_EXTENSIONS = ['.pdf', '.jpg', '.jpeg', '.png', '.tiff', '.tif'];
+
+            // Check file extension
+            const fileName = file.name.toLowerCase();
+            const fileExtension = fileName.substring(fileName.lastIndexOf('.'));
+            
+            if (!ALLOWED_EXTENSIONS.includes(fileExtension)) {
+                setError('❌ Invalid file type. Only PDF, JPG, PNG, and TIFF files are allowed.');
+                return;
+            }
+
+            // Check file size
+            const isPdf = fileExtension === '.pdf';
+            const maxSize = isPdf ? MAX_PDF_SIZE : MAX_IMAGE_SIZE;
+            const maxSizeMB = isPdf ? 15 : 10;
+
+            if (file.size > maxSize) {
+                setError(`❌ File too large. ${isPdf ? 'PDFs' : 'Images'} must be under ${maxSizeMB}MB. Your file is ${(file.size / (1024 * 1024)).toFixed(1)}MB.`);
+                return;
+            }
+
             setIsLoading(true);
 
             const userMsg = {

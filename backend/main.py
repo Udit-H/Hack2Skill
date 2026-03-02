@@ -10,8 +10,12 @@ import os
 import asyncio
 from contextlib import asynccontextmanager
 
-from fastapi import FastAPI, UploadFile, File, Form, HTTPException
+from fastapi import FastAPI, UploadFile, File, Form, HTTPException, Request
 from fastapi.middleware.cors import CORSMiddleware
+from slowapi import Limiter
+from slowapi.util import get_remote_address
+from slowapi.errors import RateLimitExceeded
+from slowapi.middleware import SlowAPIMiddleware
 from pydantic import BaseModel
 from typing import Optional
 
@@ -22,6 +26,12 @@ from models.legal import LegalAgentState, WorkflowStatus
 from models.enums import CrisisCategory
 from core.memory import MemoryManager
 from agents.legal_agent import LegalAgent
+
+# ---------------------------------------------------------------------------
+# Rate Limiter Configuration
+# ---------------------------------------------------------------------------
+limiter = Limiter(key_func=get_remote_address)
+
 
 # ---------------------------------------------------------------------------
 # In-memory session store (SQLite migration later)
@@ -82,14 +92,25 @@ app = FastAPI(
     lifespan=lifespan,
 )
 
-# CORS for local dev (Vite proxy handles it, but this is a safety net)
+# Add rate limiter state to app
+app.state.limiter = limiter
+app.add_exception_handler(RateLimitExceeded, lambda request, exc: {
+    "detail": "Rate limit exceeded. Please try again later."
+})
+
+# CORS Configuration (improved for production and local dev)
+cors_origins = os.getenv("CORS_ORIGINS", "http://localhost:5173,http://127.0.0.1:5173").split(",")
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["http://localhost:5173", "http://127.0.0.1:5173"],
+    allow_origins=cors_origins,  # Configurable via environment variable
     allow_credentials=True,
-    allow_methods=["*"],
+    allow_methods=["GET", "POST", "PUT", "DELETE", "OPTIONS"],
     allow_headers=["*"],
+    max_age=3600,  # Cache preflight requests for 1 hour
 )
+
+# Add rate limiting middleware
+app.add_middleware(SlowAPIMiddleware)
 
 
 # ---------------------------------------------------------------------------
@@ -122,7 +143,8 @@ class PanicRequest(BaseModel):
 
 
 @app.post("/api/session", response_model=SessionResponse)
-async def create_session():
+@limiter.limit("10/minute")
+async def create_session(request: Request):
     """Create a new session and return its ID."""
     session_id = f"s-{uuid.uuid4().hex[:12]}"
     sess = get_or_create_session(session_id)
@@ -137,7 +159,8 @@ async def create_session():
 
 
 @app.get("/api/session/{session_id}", response_model=SessionResponse)
-async def get_session(session_id: str):
+@limiter.limit("30/minute")
+async def get_session(request: Request, session_id: str):
     """Get current session state."""
     if session_id not in sessions:
         raise HTTPException(status_code=404, detail="Session not found")
@@ -153,7 +176,8 @@ async def get_session(session_id: str):
 
 
 @app.post("/api/chat", response_model=ChatResponse)
-async def chat(req: ChatRequest):
+@limiter.limit("20/minute")
+async def chat(request: Request, req: ChatRequest):
     """Process a user message through the active agent."""
     sess = get_or_create_session(req.session_id)
     state = sess["state"]
@@ -202,7 +226,9 @@ async def chat(req: ChatRequest):
 
 
 @app.post("/api/upload")
+@limiter.limit("5/minute")
 async def upload_document(
+    request: Request,
     file: UploadFile = File(...),
     session_id: str = Form(...),
 ):
@@ -310,7 +336,8 @@ async def upload_document(
 
 
 @app.post("/api/panic")
-async def panic_wipe(req: PanicRequest):
+@limiter.limit("1/minute")
+async def panic_wipe(request: Request, req: PanicRequest):
     """Emergency session wipe — delete all data for this session."""
     if req.session_id in sessions:
         sess = sessions.pop(req.session_id)
@@ -327,6 +354,7 @@ async def panic_wipe(req: PanicRequest):
 
 
 @app.get("/api/health")
-async def health_check():
+@limiter.limit("60/minute")
+async def health_check(request: Request):
     """Health check endpoint."""
     return {"status": "ok", "service": "sahayak-api"}

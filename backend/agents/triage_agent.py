@@ -5,10 +5,16 @@ from openai import AsyncOpenAI
 
 from models.session import SessionState, AgentResponse, AgentActionType, AgentType
 from models.triage import TriageState, TriageWorkflowStatus
+from config.config import get_settings
 
 class TriageAgent:
     def __init__(self):
-        self.client = instructor.from_openai(AsyncOpenAI())
+        settings = get_settings()
+
+        self.client = instructor.from_openai(AsyncOpenAI(
+            api_key=settings.llm.api_key,
+            base_url=settings.llm.base_url
+        ), mode=instructor.Mode.JSON)
         
         prompt_dir = os.path.join(os.path.dirname(__file__), '..', 'prompts')
         self.template_env = jinja2.Environment(loader=jinja2.FileSystemLoader(searchpath=prompt_dir))

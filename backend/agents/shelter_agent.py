@@ -6,7 +6,7 @@ from openai import AsyncOpenAI
 from config.config import get_settings
 from models.session import SessionState, AgentResponse, AgentActionType, AgentType
 from models.shelter import ShelterAgentState, ShelterWorkflowStatus
-from core.shelter_service import ShelterService
+from services.shelter_service import ShelterService
 
 class ShelterAgent:
     def __init__(self):

@@ -8,8 +8,8 @@ from config.translations import get_translated_response
 from models.legal import LegalAgentState, WorkflowStatus
 from models.triage import TriageState
 from models.session import SessionState, AgentResponse, AgentActionType, AgentType # FIX: Added Global States
-from core.rag_service import RAGService
-from core.ocr_service import DocumentIntelligenceService 
+from services.rag_service import RAGService
+from services.ocr_service import DocumentIntelligenceService 
 
 # Remove this line later
 from core.memory import MemoryManager

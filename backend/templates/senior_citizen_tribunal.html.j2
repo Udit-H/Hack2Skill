@@ -1,0 +1,78 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <style>{% include "court_base.css" %}</style>
+</head>
+<body>
+    <div class="court-header">
+        <div class="court-name">Before the Maintenance Tribunal</div>
+        <div>Under the Maintenance and Welfare of Parents and Senior Citizens Act, 2007</div>
+        <div>{{ court_jurisdiction | default("Bengaluru Urban District") }}, Karnataka</div>
+    </div>
+
+    <h1>Complaint / Application</h1>
+    <p style="text-align: center;"><em>Under Section 5 of the Maintenance and Welfare of Parents and Senior Citizens Act, 2007</em></p>
+
+    <div class="party-block">
+        <strong>{{ applicant_name }}</strong> (Senior Citizen)<br>
+        Age: {{ applicant_age | default("") }}<br>
+        Residing at: {{ property_address }}<br>
+        <em>...Complainant / Applicant</em>
+        <div class="versus">— VERSUS —</div>
+        <strong>{{ opponent_name }}</strong><br>
+        Relationship: {{ relationship | default("Son/Daughter/Legal Heir") }}<br>
+        <em>...Respondent</em>
+    </div>
+
+    <h2>Facts of the Case</h2>
+
+    <div class="numbered-para">
+        1. That the Applicant, <strong>{{ applicant_name }}</strong>, is a Senior Citizen aged {{ applicant_age | default("above 60") }} years and is unable to maintain themselves from their own earnings or property.
+    </div>
+
+    <div class="numbered-para">
+        2. That the property situated at <strong>{{ property_address }}</strong> {% if is_property_in_applicant_name %}is registered in the name of the Applicant{% else %}was the shared residence of the Applicant{% endif %}.
+    </div>
+
+    <div class="numbered-para">
+        3. That the Respondent, <strong>{{ opponent_name }}</strong>, being the {{ relationship | default("child/legal heir") }} of the Applicant, is legally obligated under the Act to provide maintenance and care.
+    </div>
+
+    <div class="numbered-para">
+        4. {{ draft_body_summary }}
+    </div>
+
+    <div class="numbered-para">
+        5. That despite repeated requests, the Respondent has failed/refused to provide maintenance and has attempted to evict/dispossess the Applicant from the said premises.
+    </div>
+
+    <div class="prayer-section">
+        <h2>Prayer</h2>
+        <p>The Applicant most respectfully prays that this Hon'ble Tribunal may be pleased to:</p>
+        <div class="numbered-para">
+            (a) Direct the Respondent to pay a monthly maintenance amount sufficient for the basic needs of the Applicant including food, clothing, shelter, and medical attention;
+        </div>
+        <div class="numbered-para">
+            (b) Restrain the Respondent from evicting or dispossessing the Applicant from the property at <strong>{{ property_address }}</strong>;
+        </div>
+        <div class="numbered-para">
+            (c) If the property was transferred by the Applicant to the Respondent, declare the transfer void under Section 23 of the Act on the grounds of neglect/non-maintenance;
+        </div>
+        <div class="numbered-para">
+            (d) Pass any other order as this Hon'ble Tribunal deems fit and just.
+        </div>
+    </div>
+
+    <div class="date-place">
+        <strong>Place:</strong> {{ place | default("Bengaluru") }}<br>
+        <strong>Date:</strong> {{ date_of_draft }}
+    </div>
+
+    <div class="signature-block">
+        <div class="line"></div>
+        <strong>{{ applicant_name }}</strong><br>
+        Complainant / Applicant<br>
+        Contact: {{ applicant_phone | default("") }}
+    </div>
+</body>
+</html>

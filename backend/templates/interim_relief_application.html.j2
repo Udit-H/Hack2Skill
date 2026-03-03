@@ -1,0 +1,72 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <style>{% include "court_base.css" %}</style>
+</head>
+<body>
+    <div class="court-header">
+        <div class="court-name">In the Court of the Civil Judge (Senior Division)</div>
+        <div>{{ court_jurisdiction | default("Bengaluru Urban District") }}, Karnataka</div>
+    </div>
+
+    <h1>Application for Interim Relief</h1>
+    <p style="text-align: center;"><em>Under Section 151 of CPC read with Order XXXIX Rules 1 & 2</em></p>
+
+    <div class="party-block">
+        <strong>{{ applicant_name }}</strong><br>
+        Residing at: {{ property_address }}<br>
+        <em>...Applicant</em>
+        <div class="versus">— VERSUS —</div>
+        <strong>{{ opponent_name }}</strong><br>
+        <em>...Respondent</em>
+    </div>
+
+    <h2>Urgent Application for Interim Relief</h2>
+
+    <div class="body-text">
+        The Applicant most respectfully submits this application seeking urgent interim relief and states as follows:
+    </div>
+
+    <div class="numbered-para">
+        1. That the Applicant is the lawful occupant of the premises at <strong>{{ property_address }}</strong> and has been forcibly/illegally dispossessed by the Respondent on or about <strong>{{ incident_date | default("the recent date") }}</strong>.
+    </div>
+
+    <div class="numbered-para">
+        2. {{ draft_body_summary }}
+    </div>
+
+    <div class="numbered-para">
+        3. That the Applicant has no alternative accommodation and is in urgent need of restoration of possession. The dispossession has caused severe hardship to the Applicant and family.
+    </div>
+
+    <div class="numbered-para">
+        4. That the matter is extremely urgent as the Applicant is currently without shelter and needs immediate intervention of this Hon'ble Court.
+    </div>
+
+    <div class="prayer-section">
+        <h2>Prayer</h2>
+        <p>It is therefore most respectfully prayed that this Hon'ble Court may be pleased to:</p>
+        <div class="numbered-para">
+            (a) Direct the Respondent to immediately restore possession of the premises at <strong>{{ property_address }}</strong> to the Applicant;
+        </div>
+        <div class="numbered-para">
+            (b) Restrain the Respondent from entering or interfering with the Applicant's possession;
+        </div>
+        <div class="numbered-para">
+            (c) Grant any other interim relief as this Hon'ble Court deems just and proper.
+        </div>
+    </div>
+
+    <div class="date-place">
+        <strong>Place:</strong> {{ place | default("Bengaluru") }}<br>
+        <strong>Date:</strong> {{ date_of_draft }}
+    </div>
+
+    <div class="signature-block">
+        <div class="line"></div>
+        <strong>{{ applicant_name }}</strong><br>
+        Applicant<br>
+        Contact: {{ applicant_phone | default("") }}
+    </div>
+</body>
+</html>

@@ -3,13 +3,15 @@ from typing import Optional, List
 from enum import Enum
 from models.triage import TriageState
 from models.legal import LegalAgentState
-from models.shelter import ShelterAgentState 
+from models.shelter import ShelterAgentState
+from models.drafting import DraftingAgentState
 
 class AgentType(str, Enum):
     ORCHESTRATOR = "orchestrator" # Doing initial triage
     TRIAGE = "triage"
     LEGAL = "legal"
     SHELTER = "shelter"
+    DRAFTING = "drafting"
     COMPLETED = "completed"
 
 class AgentActionType(str, Enum):
@@ -34,5 +36,6 @@ class SessionState(BaseModel):
     triage: Optional[TriageState] = None
     legal: Optional[LegalAgentState] = None
     shelter: Optional[ShelterAgentState] = None
+    drafting: Optional[DraftingAgentState] = None
     
     chat_history: List[dict] = Field(default_factory=list, description="Recent message history for context.")

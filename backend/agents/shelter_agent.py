@@ -143,8 +143,12 @@ class ShelterAgent:
 
         else:
             if not current_state.next_question_for_user:
-                response.reply_message = "I am processing your preferences to find the safest nearby options..."
-                current_state.trigger_new_db_search = True 
+                if current_state.matched_shelters:
+                    shelter_list = "\n".join([
+                        f"- **{s.name}** ({s.shelter_type}) - {s.distance_km} km away. {s.google_maps_url}"
+                        for s in current_state.matched_shelters[:5]
+                    ])
+                    response.reply_message = f"Here are the available shelters:\n{shelter_list}\n\nWhich one would you like me to contact for you?"
             else:
                 response.reply_message = current_state.next_question_for_user
             

@@ -32,7 +32,7 @@ export function useChat() {
 
     const send = useCallback(
         async (text) => {
-            if (!text.trim() || isLoading) return;
+            if (!text.trim() || isLoading || !sessionId) return;
             setError(null);
 
             const userMsg = {

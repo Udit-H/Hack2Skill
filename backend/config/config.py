@@ -21,20 +21,20 @@ class RedisDbSettings(BaseSettings):
     port: Optional[int] = os.getenv("REDIS_PORT", 14324)
 
 class SupabaseDbSettings(BaseSettings):
-    url: str = os.getenv("SUPABASE_URL")
-    pub_key: str = os.getenv("SUPABASE_PUB_KEY")
-    service_key: str = os.getenv("SUPABASE_ANON_KEY")
+    url: Optional[str] = os.getenv("SUPABASE_URL", "")
+    pub_key: Optional[str] = os.getenv("SUPABASE_PUB_KEY", "")
+    service_key: Optional[str] = os.getenv("SUPABASE_ANON_KEY", "")
 
 class CohereSettings(BaseSettings):
-    api_key: str = os.getenv("COHERE_API_KEY")
+    api_key: Optional[str] = os.getenv("COHERE_API_KEY", "")
     base_url: str = "https://api.cohere.ai/v2"
     client_name: str = "Development_Phase"
     timeout: float = 4.0
 
 class ChromaDbSettings(BaseSettings):
-    tenant: str = os.getenv("CHROMA_TENANT")
-    database: str = os.getenv("CHROMA_DATABASE")
-    token: str = os.getenv("CHROMA_TOKEN")
+    tenant: Optional[str] = os.getenv("CHROMA_TENANT", "")
+    database: Optional[str] = os.getenv("CHROMA_DATABASE", "")
+    token: Optional[str] = os.getenv("CHROMA_TOKEN", "")
 
 class Settings(BaseSettings):
     document_intelligence: DocumentIntelligenceSettings = DocumentIntelligenceSettings()

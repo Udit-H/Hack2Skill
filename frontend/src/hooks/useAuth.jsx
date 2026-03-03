@@ -1,28 +1,23 @@
-import { useState, useEffect, useContext, createContext } from 'react';
-import { onAuthStateChanged, signOut } from 'firebase/auth';
-import { auth } from '../utils/firebase';
+import { useState, useContext, createContext } from 'react';
 
 const AuthContext = createContext();
 
 export function AuthProvider({ children }) {
-  const [user, setUser] = useState(null);
-  const [loading, setLoading] = useState(true);
+  // Simple anonymous auth — no Firebase
+  const [user, setUser] = useState({ anonymous: true });
+  const loading = false;
 
-  useEffect(() => {
-    const unsubscribe = onAuthStateChanged(auth, (currentUser) => {
-      setUser(currentUser);
-      setLoading(false);
-    });
+  const logout = () => {
+    setUser(null);
+    window.location.href = '/';
+  };
 
-    return unsubscribe;
-  }, []);
-
-  const logout = async () => {
-    await signOut(auth);
+  const loginAnonymous = () => {
+    setUser({ anonymous: true });
   };
 
   return (
-    <AuthContext.Provider value={{ user, loading, logout }}>
+    <AuthContext.Provider value={{ user, loading, logout, loginAnonymous }}>
       {children}
     </AuthContext.Provider>
   );

@@ -70,10 +70,10 @@ class LegalAgent:
     
     async def process_turn(
         self, 
-        session: SessionState,  
+        session: SessionState, 
+        memory_manager, 
         user_message: str = None, 
         document_path: str = None,
-        memory_manager = None,
         language: str = "en",
     ) -> AgentResponse: 
         """
@@ -81,6 +81,12 @@ class LegalAgent:
         """
 
         triage = session.triage
+
+        # Initialize Legal state if it doesn't exist yet
+        if not session.legal:
+            from models.legal import LegalAgentState
+            session.legal = LegalAgentState()
+            
         current_state = session.legal
 
         memory_context = memory_manager.get_memory_context()

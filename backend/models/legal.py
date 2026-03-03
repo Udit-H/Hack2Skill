@@ -8,10 +8,21 @@ from typing import Optional, List
 from enum import Enum
 
 class DraftType(str, Enum):
-    DELHI_SHO_INTIMATION = "delhi_sho_intimation"           # Case 1
-    DIR_FORM_1 = "dir_form_1"                               # Case 2
-    DELHI_DM_EVICTION_PETITION = "delhi_dm_eviction_petition" # Case 3
-    DSLSA_LEGAL_AID_FORM = "dslsa_legal_aid_form"           # Case 5
+    # Eviction
+    POLICE_INTIMATION = "police_intimation"                     # Police complaint (BNS 126)
+    CIVIL_INJUNCTION_PETITION = "civil_injunction_petition"     # Civil court injunction
+    INTERIM_RELIEF_APPLICATION = "interim_relief_application"   # Interim relief
+    # Domestic Violence
+    DIR_FORM_1 = "dir_form_1"                                   # Domestic Incident Report
+    SECTION_12_PETITION = "section_12_petition"                 # DV Act Section 12
+    # Shelter
+    SHELTER_REFERRAL = "shelter_referral"                       # Referral to shelter org
+    BBMP_SHELTER_REQUEST = "bbmp_shelter_request"               # BBMP shelter request
+    NGO_REFERRAL = "ngo_referral"                               # NGO referral letter
+    # Senior Citizen
+    SENIOR_CITIZEN_TRIBUNAL = "senior_citizen_tribunal"         # 2007 Act tribunal complaint
+    # Legal Aid
+    KSLSA_LEGAL_AID = "kslsa_legal_aid"                         # Karnataka State Legal Services
 
 class WorkflowStatus(str, Enum):
     AWAITING_DOCS = "awaiting_docs"
@@ -35,7 +46,7 @@ class LegalDraftPayload(BaseModel):
     draft_body_summary: str = Field(description="JSON or Text mapping for the specific legal form.")
 
 class LegalAgentState(BaseModel):
-    workflow_status: WorkflowStatus
+    workflow_status: WorkflowStatus = WorkflowStatus.AWAITING_DOCS
     extracted_doc_data: Optional[str] = Field(None, description="Raw OCR text.")
     retrieved_legal_context: Optional[str] = Field(None, description="Delhi laws from RAGFlow.")
     

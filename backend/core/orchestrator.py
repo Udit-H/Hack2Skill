@@ -3,10 +3,12 @@ from models.session import SessionState, AgentType, AgentActionType
 from models.triage import TriageWorkflowStatus
 from models.shelter import ShelterWorkflowStatus
 from models.legal import WorkflowStatus as LegalWorkflowStatus
+from models.drafting import DraftingWorkflowStatus
 
 from agents.triage_agent import TriageAgent
 from agents.shelter_agent import ShelterAgent
 from agents.legal_agent import LegalAgent
+from agents.drafting_agent import DraftingAgent
 
 class Orchestrator:
     def __init__(self):
@@ -14,6 +16,7 @@ class Orchestrator:
         self.triage_agent = TriageAgent()
         self.shelter_agent = ShelterAgent()
         self.legal_agent = LegalAgent()
+        self.drafting_agent = DraftingAgent()
 
     async def handle_turn(
         self, 
@@ -81,11 +84,23 @@ class Orchestrator:
 
         # RULE 3: Legal is third (Only if Triage explicitly flagged it AND Shelter is done/skipped).
         if triage.needs_legal_action:
-            if legal is None or legal.workflow_status != LegalWorkflowStatus.READY_TO_DRAFT: # Make sure you add COMPLETED to LegalWorkflowStatus
+            if legal is None or legal.workflow_status != LegalWorkflowStatus.READY_TO_DRAFT:
                 session.active_agent = AgentType.LEGAL
                 return
 
-        # RULE 4: Everything is done.
+        # RULE 4: Drafting is fourth (if Legal finished with drafts OR Shelter finished with consent)
+        drafting = session.drafting
+        has_legal_drafts = (legal and legal.workflow_status == LegalWorkflowStatus.READY_TO_DRAFT 
+                           and legal.drafts_to_generate)
+        has_shelter_consent = (shelter and shelter.workflow_status == ShelterWorkflowStatus.COMPLETED 
+                              and shelter.user_consent_to_share)
+        
+        if has_legal_drafts or has_shelter_consent:
+            if drafting is None or drafting.workflow_status != DraftingWorkflowStatus.COMPLETED:
+                session.active_agent = AgentType.DRAFTING
+                return
+
+        # RULE 5: Everything is done.
         session.active_agent = AgentType.COMPLETED
 
 
@@ -100,6 +115,9 @@ class Orchestrator:
             
         elif session.active_agent == AgentType.LEGAL:
             return await self.legal_agent.process_turn(session, memory_manager, user_message, document_path)
+        
+        elif session.active_agent == AgentType.DRAFTING:
+            return await self.drafting_agent.process_turn(session, memory_manager, user_message)
             
         elif session.active_agent == AgentType.COMPLETED:
             # Fallback if the user keeps typing after everything is done

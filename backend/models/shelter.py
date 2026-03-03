@@ -19,7 +19,7 @@ class ShelterProfile(BaseModel):
     google_maps_url: str
 
 class ShelterAgentState(BaseModel):
-    workflow_status: ShelterWorkflowStatus
+    workflow_status: ShelterWorkflowStatus = ShelterWorkflowStatus.AWAITING_LOCATION
     
     user_location_text: Optional[str] = Field(None, description="City, area, or pin provided by user.")
     user_coordinates: Optional[dict] = Field(None, description="{'lat': float, 'lng': float}")

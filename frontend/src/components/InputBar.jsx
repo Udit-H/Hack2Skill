@@ -1,10 +1,24 @@
-import { useState, useRef } from 'react';
+import { useState, useRef, useEffect } from 'react';
 
 export default function InputBar({ onSend, onUpload, isLoading }) {
     const [text, setText] = useState('');
     const [selectedFile, setSelectedFile] = useState(null);
     const fileRef = useRef(null);
     const textareaRef = useRef(null);
+    const prevIsLoading = useRef(isLoading);
+
+    // Auto-focus on mount and when loading finishes
+    useEffect(() => {
+        if (prevIsLoading.current && !isLoading) {
+            textareaRef.current?.focus();
+        }
+        prevIsLoading.current = isLoading;
+    }, [isLoading]);
+
+    useEffect(() => {
+        // Initial focus
+        textareaRef.current?.focus();
+    }, []);
 
     const handleSend = () => {
         if (selectedFile) {

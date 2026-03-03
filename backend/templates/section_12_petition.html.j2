@@ -1,0 +1,78 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <style>{% include "court_base.css" %}</style>
+</head>
+<body>
+    <div class="court-header">
+        <div class="court-name">In the Court of the Magistrate / Protection Officer</div>
+        <div>Under the Protection of Women from Domestic Violence Act, 2005</div>
+        <div>{{ court_jurisdiction | default("Bengaluru Urban District") }}, Karnataka</div>
+    </div>
+
+    <h1>Application Under Section 12</h1>
+    <p style="text-align: center;"><em>For orders under Sections 18, 19, 20, 21 and 22 of the PWDV Act, 2005</em></p>
+
+    <div class="party-block">
+        <strong>{{ applicant_name }}</strong><br>
+        Residing at: {{ property_address | default("Address as stated below") }}<br>
+        <em>...Aggrieved Person / Applicant</em>
+        <div class="versus">— VERSUS —</div>
+        <strong>{{ opponent_name }}</strong><br>
+        <em>...Respondent</em>
+    </div>
+
+    <h2>1. Particulars of the Aggrieved Person</h2>
+    <table>
+        <tr><th>Name</th><td>{{ applicant_name }}</td></tr>
+        <tr><th>Age</th><td>{{ applicant_age | default("") }}</td></tr>
+        <tr><th>Address</th><td>{{ property_address | default("") }}</td></tr>
+        <tr><th>Relationship with Respondent</th><td>{{ relationship | default("") }}</td></tr>
+    </table>
+
+    <h2>2. Particulars of the Respondent</h2>
+    <table>
+        <tr><th>Name</th><td>{{ opponent_name }}</td></tr>
+        <tr><th>Address</th><td>{{ respondent_address | default("") }}</td></tr>
+    </table>
+
+    <h2>3. Details of Domestic Violence</h2>
+    <div class="body-text">
+        {{ draft_body_summary }}
+    </div>
+
+    <h2>4. Orders Sought</h2>
+    <div class="numbered-para">
+        (a) <strong>Protection Order (Section 18):</strong> Restraining the Respondent from committing any act of domestic violence, aiding or abetting the same.
+    </div>
+    <div class="numbered-para">
+        (b) <strong>Residence Order (Section 19):</strong> Directing the Respondent to not dispossess the Aggrieved Person from the shared household.
+    </div>
+    <div class="numbered-para">
+        (c) <strong>Monetary Relief (Section 20):</strong> Directing the Respondent to pay monetary relief to meet expenses incurred and losses suffered.
+    </div>
+    <div class="numbered-para">
+        (d) <strong>Custody Order (Section 21):</strong> Granting temporary custody of children to the Aggrieved Person, if applicable.
+    </div>
+    <div class="numbered-para">
+        (e) <strong>Compensation Order (Section 22):</strong> Directing the Respondent to pay compensation for injuries including mental torture.
+    </div>
+
+    <div class="prayer-section">
+        <h2>Prayer</h2>
+        <p>The Aggrieved Person most humbly prays that this Hon'ble Court be pleased to pass appropriate orders as stated above, and any other relief deemed fit in the interest of justice and safety of the Aggrieved Person.</p>
+    </div>
+
+    <div class="date-place">
+        <strong>Place:</strong> {{ place | default("Bengaluru") }}<br>
+        <strong>Date:</strong> {{ date_of_draft }}
+    </div>
+
+    <div class="signature-block">
+        <div class="line"></div>
+        <strong>{{ applicant_name }}</strong><br>
+        Aggrieved Person / Applicant<br>
+        Contact: {{ applicant_phone | default("") }}
+    </div>
+</body>
+</html>

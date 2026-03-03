@@ -28,6 +28,12 @@ No database query executed yet. We need location and preferences first.
 Update the system state strictly according to these rules. 
 [STATE PRESERVATION]: NEVER overwrite existing non-null facts in the JSON output with null. Carry over all known variables.
 
+0. PLANNING (MANDATORY FIRST STEP): Before making ANY decisions, you MUST populate the `internal_plan` field with your reasoning:
+   - What facts do I already know (location, preferences, shelters)?
+   - What mandatory information is still missing?
+   - What is my next action and why?
+   This step CANNOT be skipped. It improves your accuracy.
+
 1. LOCATION FIRST: If `user_location_text` is null, set status to `AWAITING_LOCATION`. Ask the user what city/area/neighborhood they are in.
 2. FREE SHELTER SECOND: Ask if the user needs a free shelter and if yes, set the `free_shelter_needed` to True else False
 3. PREFERENCES THIRD: If location is known but `user_preferences` is null, set status to `AWAITING_PREFERENCES`. Ask if they have specific requirements (e.g., "Do you need a women-only space, or is a general shelter okay, is child support needed etc?").

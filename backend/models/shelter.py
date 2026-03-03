@@ -19,6 +19,12 @@ class ShelterProfile(BaseModel):
     google_maps_url: str
 
 class ShelterAgentState(BaseModel):
+    internal_plan: list[str] = Field(
+        default_factory=list,
+        description="MANDATORY FIRST STEP: Before any decision, list your reasoning. "
+                    "1) What facts do I already know? 2) What is missing? 3) What should I do next and why?"
+    )
+    
     workflow_status: ShelterWorkflowStatus = ShelterWorkflowStatus.AWAITING_LOCATION
     
     user_location_text: Optional[str] = Field(None, description="City, area, or pin provided by user.")

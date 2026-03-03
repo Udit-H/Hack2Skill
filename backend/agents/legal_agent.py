@@ -5,6 +5,7 @@ from openai import AsyncOpenAI
 
 from config.config import get_settings
 from config.translations import get_translated_response
+from models.enums import CrisisCategory
 from models.legal import LegalAgentState, WorkflowStatus
 from models.triage import TriageState
 from models.session import SessionState, AgentResponse, AgentActionType, AgentType # FIX: Added Global States
@@ -54,10 +55,17 @@ class LegalAgent:
             rag_query = f"Laws regarding {triage.category.value}: {triage.incident_summary}"
             response = await self.rag_service.search(rag_query)
             current_state.retrieved_legal_context = response.answer
-            # Mocking RAG for now
-            # current_state.retrieved_legal_context = "Bengaluru Rent Control Act applies. Police Intimation under BNS 126 for wrongful restraint."
 
-        template = self.template_env.get_template("legal_agent_system.j2")
+        # --- PHASE 2: SELECT PROMPT BY CRISIS CATEGORY ---
+        category = triage.category
+        if category == CrisisCategory.DOMESTIC_VIOLENCE:
+            template = self.template_env.get_template("legal_agent_dv_system.j2")
+        elif category == CrisisCategory.SENIOR_CITIZEN_NEGLECT:
+            template = self.template_env.get_template("legal_agent_senior_system.j2")
+        else:
+            # Default: eviction / unclear / natural disaster
+            template = self.template_env.get_template("legal_agent_system.j2")
+        
         state_json = current_state.model_dump_json(exclude={"extracted_doc_data", "retrieved_legal_context"})
         
         return template.render(

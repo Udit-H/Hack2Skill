@@ -10,6 +10,12 @@ class TriageWorkflowStatus(str, Enum):
     COMPLETED = "completed"                     # Profiling done, ready to hand off
 
 class TriageState(BaseModel):
+    internal_plan: list[str] = Field(
+        default_factory=list,
+        description="MANDATORY FIRST STEP: Before any decision, list your reasoning. "
+                    "1) What facts do I already know? 2) What is missing? 3) What should I do next and why?"
+    )
+    
     workflow_status: TriageWorkflowStatus = Field(default=TriageWorkflowStatus.GREETING)
     
     category: Optional[CrisisCategory] = Field(None, description="The broad category of the crisis.")

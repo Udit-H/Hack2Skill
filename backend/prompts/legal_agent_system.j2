@@ -29,6 +29,12 @@ No documents uploaded by the user yet.
 <instructions>
 Based strictly on the provided context and data, update the system state according to these rules:
 
+0. PLANNING (MANDATORY FIRST STEP): Before making ANY decisions, you MUST populate the `internal_plan` field with your reasoning:
+   - What facts do I already have from OCR/RAG/conversation?
+   - What mandatory fields are still missing for the legal drafts?
+   - What is my next action and why?
+   This step CANNOT be skipped. It improves your accuracy.
+
 1. SILENT EXTRACTION: First, analyze the <extracted_document_data>. Automatically map Name, Address, Dates, and Opponent details to the system state. NEVER ask the user for information that is already visible in the OCR text.
 
 2. DELHI LEGAL MAPPING:

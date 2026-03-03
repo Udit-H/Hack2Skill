@@ -1,0 +1,150 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <style>{% include "court_base.css" %}</style>
+    <style>
+        .form-header { text-align: center; margin-bottom: 20px; }
+        .form-header h2 { margin: 5px 0; }
+        .checkbox-row { margin: 4px 0; padding-left: 20px; }
+        .checkbox-row input[type="checkbox"] { margin-right: 8px; }
+        .section-box { border: 1px solid #333; padding: 15px; margin: 15px 0; }
+        .field-row { margin: 8px 0; }
+        .field-label { font-weight: bold; display: inline-block; min-width: 200px; }
+        .field-value { border-bottom: 1px solid #999; display: inline-block; min-width: 250px; padding: 2px 5px; }
+        .violence-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 5px 20px; margin: 10px 0; }
+    </style>
+</head>
+<body>
+    <div class="form-header">
+        <h2>FORM I</h2>
+        <p><strong>DOMESTIC INCIDENT REPORT</strong></p>
+        <p><em>[See Rule 5(1) and 17(3)]</em></p>
+        <p>Under the Protection of Women from Domestic Violence Act, 2005<br>
+        (Protection of Women from Domestic Violence Rules, 2006)</p>
+    </div>
+
+    <!-- PART 1: Details of Complainant / Aggrieved Person -->
+    <div class="section-box">
+        <h2>1. Details of the Aggrieved Person</h2>
+        <div class="field-row">
+            <span class="field-label">Name:</span>
+            <span class="field-value">{{ applicant_name }}</span>
+        </div>
+        <div class="field-row">
+            <span class="field-label">Age:</span>
+            <span class="field-value">{{ applicant_age | default("") }}</span>
+        </div>
+        <div class="field-row">
+            <span class="field-label">Address (Current):</span>
+            <span class="field-value">{{ property_address }}</span>
+        </div>
+        <div class="field-row">
+            <span class="field-label">Phone:</span>
+            <span class="field-value">{{ applicant_phone | default("") }}</span>
+        </div>
+    </div>
+
+    <!-- PART 2: Details of Respondent -->
+    <div class="section-box">
+        <h2>2. Details of the Respondent</h2>
+        <div class="field-row">
+            <span class="field-label">Name:</span>
+            <span class="field-value">{{ opponent_name }}</span>
+        </div>
+        <div class="field-row">
+            <span class="field-label">Relationship to Aggrieved Person:</span>
+            <span class="field-value">{{ relationship | default("") }}</span>
+        </div>
+        <div class="field-row">
+            <span class="field-label">Address:</span>
+            <span class="field-value">{{ respondent_address | default(property_address) }}</span>
+        </div>
+    </div>
+
+    <!-- PART 3: Details of Children (if any) -->
+    <div class="section-box">
+        <h2>3. Children</h2>
+        {% if children_involved %}
+        <p>Number of children: <strong>{{ number_of_children | default("") }}</strong></p>
+        <p>The Aggrieved Person seeks custody / protection of children from the Respondent.</p>
+        {% else %}
+        <p>No minor children involved / Not applicable.</p>
+        {% endif %}
+    </div>
+
+    <!-- PART 4: Nature of Domestic Violence -->
+    <div class="section-box">
+        <h2>4. Nature of Acts of Domestic Violence</h2>
+        <p><em>(As defined under Section 3 of the PWDV Act, 2005)</em></p>
+
+        <div class="violence-grid">
+            {% set violence_list = violence_types if violence_types else [] %}
+            <div class="checkbox-row">
+                {% if 'physical' in violence_list %}☑{% else %}☐{% endif %}
+                <strong>Physical Violence</strong> — Causing bodily pain, harm, or danger to life, limb, health, or development
+            </div>
+            <div class="checkbox-row">
+                {% if 'sexual' in violence_list %}☑{% else %}☐{% endif %}
+                <strong>Sexual Violence</strong> — Any conduct of a sexual nature that abuses, humiliates, degrades, or otherwise violates dignity
+            </div>
+            <div class="checkbox-row">
+                {% if 'emotional' in violence_list or 'verbal' in violence_list %}☑{% else %}☐{% endif %}
+                <strong>Verbal and Emotional Abuse</strong> — Insults, ridicule, humiliation, name-calling, threats
+            </div>
+            <div class="checkbox-row">
+                {% if 'economic' in violence_list %}☑{% else %}☐{% endif %}
+                <strong>Economic Abuse</strong> — Deprivation of economic/financial resources, prohibition from employment, not providing maintenance
+            </div>
+        </div>
+    </div>
+
+    <!-- PART 5: Description of Incident -->
+    <div class="section-box">
+        <h2>5. Description of the Incident(s) of Domestic Violence</h2>
+        <div class="body-text">
+            {{ draft_body_summary }}
+        </div>
+        {% if marriage_date %}
+        <p><strong>Date of Marriage:</strong> {{ marriage_date }}</p>
+        {% endif %}
+    </div>
+
+    <!-- PART 6: Relief Sought -->
+    <div class="section-box">
+        <h2>6. Reliefs / Orders Sought</h2>
+        <div class="checkbox-row">☑ Protection Order under Section 18</div>
+        <div class="checkbox-row">☑ Residence Order under Section 19</div>
+        <div class="checkbox-row">☑ Monetary Relief under Section 20</div>
+        {% if children_involved %}
+        <div class="checkbox-row">☑ Custody Order under Section 21</div>
+        {% endif %}
+        <div class="checkbox-row">☑ Compensation Order under Section 22</div>
+    </div>
+
+    <!-- PART 7: Previous Complaints -->
+    <div class="section-box">
+        <h2>7. Previous Applications / Complaints</h2>
+        <p>{{ previous_complaints | default("No previous complaints filed with any Protection Officer, Service Provider, or Magistrate.") }}</p>
+    </div>
+
+    <!-- Signature -->
+    <div class="date-place">
+        <strong>Place:</strong> {{ place | default("Bengaluru") }}<br>
+        <strong>Date:</strong> {{ date_of_draft }}
+    </div>
+
+    <div class="signature-block">
+        <div class="line"></div>
+        <strong>{{ applicant_name }}</strong><br>
+        Aggrieved Person<br>
+        Contact: {{ applicant_phone | default("") }}
+    </div>
+
+    <div style="margin-top: 30px; padding: 10px; border: 1px dashed #666; font-size: 0.85em;">
+        <strong>Note:</strong> This Domestic Incident Report is prepared in Form I as prescribed under Rule 5(1) of the 
+        Protection of Women from Domestic Violence Rules, 2006. It should be submitted to the Protection Officer 
+        or Service Provider having jurisdiction. The aggrieved person is advised to also file a copy with the 
+        nearest police station.
+    </div>
+</body>
+</html>

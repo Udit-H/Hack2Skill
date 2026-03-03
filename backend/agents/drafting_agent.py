@@ -34,6 +34,8 @@ TEMPLATE_MAP = {
     DraftType.NGO_REFERRAL: "ngo_referral.html.j2",
     # Senior Citizen
     DraftType.SENIOR_CITIZEN_TRIBUNAL: "senior_citizen_tribunal.html.j2",
+    # Safety
+    DraftType.SAFETY_PLAN: "safety_plan.html.j2",
     # Legal Aid
     DraftType.KSLSA_LEGAL_AID: "kslsa_legal_aid.html.j2",
 }
@@ -49,6 +51,7 @@ DRAFT_TITLES = {
     DraftType.BBMP_SHELTER_REQUEST: "BBMP Shelter Request",
     DraftType.NGO_REFERRAL: "NGO Referral Letter",
     DraftType.SENIOR_CITIZEN_TRIBUNAL: "Senior Citizen Tribunal Complaint",
+    DraftType.SAFETY_PLAN: "Personal Safety Plan",
     DraftType.KSLSA_LEGAL_AID: "KSLSA Legal Aid Application",
 }
 
@@ -230,6 +233,17 @@ class DraftingAgent:
             "monthly_income": payload.monthly_income,
             "caste_category": payload.caste_category or "",
             "is_property_in_applicant_name": payload.is_property_in_applicant_name,
+            # DV-specific fields
+            "relationship": payload.relationship_to_respondent or "",
+            "violence_types": payload.violence_types or [],
+            "children_involved": payload.children_involved or False,
+            "number_of_children": payload.number_of_children,
+            "marriage_date": payload.marriage_date or "",
+            "immediate_danger": payload.immediate_danger or False,
+            # Safety plan fields
+            "trusted_contact_name": payload.trusted_contact_name or "",
+            "trusted_contact_phone": payload.trusted_contact_phone or "",
+            "safe_location": payload.safe_location or "",
             # Generated
             "date_of_draft": datetime.now().strftime("%d/%m/%Y"),
             "place": "Bengaluru",

@@ -1,0 +1,138 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <style>
+        @page { size: A4; margin: 2cm; }
+        body { font-family: 'Noto Sans', Arial, sans-serif; font-size: 11pt; line-height: 1.5; color: #333; }
+        h1 { color: #8B0000; text-align: center; border-bottom: 3px solid #8B0000; padding-bottom: 10px; }
+        h2 { color: #8B0000; margin-top: 25px; border-left: 4px solid #8B0000; padding-left: 10px; }
+        .emergency-box { background: #FFF3F3; border: 2px solid #CC0000; border-radius: 8px; padding: 15px; margin: 20px 0; }
+        .emergency-box h3 { color: #CC0000; margin-top: 0; }
+        .helpline { display: flex; justify-content: space-between; padding: 8px 0; border-bottom: 1px solid #eee; }
+        .helpline-name { font-weight: bold; }
+        .helpline-number { font-size: 14pt; font-weight: bold; color: #CC0000; }
+        .checklist { list-style: none; padding: 0; }
+        .checklist li { padding: 6px 0; padding-left: 30px; position: relative; }
+        .checklist li::before { content: "☐"; position: absolute; left: 0; font-size: 14pt; }
+        .contact-card { background: #F0F8FF; border: 1px solid #4682B4; border-radius: 8px; padding: 15px; margin: 10px 0; }
+        .important { background: #FFFACD; border-left: 4px solid #DAA520; padding: 10px 15px; margin: 15px 0; font-style: italic; }
+        .footer-note { text-align: center; font-size: 9pt; color: #666; margin-top: 30px; border-top: 1px solid #ccc; padding-top: 10px; }
+    </style>
+</head>
+<body>
+    <h1>🛡️ Personal Safety Plan</h1>
+    <p style="text-align: center;"><em>Prepared for <strong>{{ applicant_name }}</strong> on {{ date_of_draft }}</em></p>
+    <p style="text-align: center; color: #666;">This document is CONFIDENTIAL. Keep it in a safe place — with a trusted person, NOT in the shared household.</p>
+
+    <!-- EMERGENCY HELPLINES -->
+    <div class="emergency-box">
+        <h3>🚨 Emergency Helplines — Call Immediately If In Danger</h3>
+        <div class="helpline">
+            <span class="helpline-name">Women Helpline (24/7, Free)</span>
+            <span class="helpline-number">181</span>
+        </div>
+        <div class="helpline">
+            <span class="helpline-name">Police Emergency</span>
+            <span class="helpline-number">100</span>
+        </div>
+        <div class="helpline">
+            <span class="helpline-name">National Commission for Women</span>
+            <span class="helpline-number">7827-170-170</span>
+        </div>
+        <div class="helpline">
+            <span class="helpline-name">One Stop Centre (Sakhi)</span>
+            <span class="helpline-number">181 (ask for nearest centre)</span>
+        </div>
+        <div class="helpline">
+            <span class="helpline-name">Child Helpline (if children involved)</span>
+            <span class="helpline-number">1098</span>
+        </div>
+    </div>
+
+    <!-- TRUSTED CONTACT -->
+    <h2>👤 My Trusted Contact</h2>
+    <div class="contact-card">
+        <strong>Name:</strong> {{ trusted_contact_name | default("_______________") }}<br>
+        <strong>Phone:</strong> {{ trusted_contact_phone | default("_______________") }}<br>
+        <strong>Safe Location:</strong> {{ safe_location | default("_______________") }}
+    </div>
+    <div class="important">
+        Share this safety plan with your trusted contact. If you press the Emergency Exit button on Sahayak, 
+        all data will be wiped from the app — but this downloaded PDF stays safe on your phone or with your trusted person.
+    </div>
+
+    <!-- SAFE EXIT PLAN -->
+    <h2>🚪 Safe Exit Plan</h2>
+    <p>If you need to leave quickly, plan your route in advance:</p>
+    <ul class="checklist">
+        <li>Identify the safest door/exit (not blocked by the abuser's usual location)</li>
+        <li>Practice the route mentally — even at night</li>
+        <li>Keep footwear near the exit</li>
+        <li>If possible, keep a phone with emergency numbers saved</li>
+        <li>Decide in advance: go to <strong>{{ safe_location | default("your trusted contact's home") }}</strong></li>
+        <li>If children are involved, plan how to take them safely</li>
+        {% if immediate_danger %}
+        <li><strong>⚠️ You indicated you may be in immediate danger. Please prioritize leaving TONIGHT if possible.</strong></li>
+        {% endif %}
+    </ul>
+
+    <!-- GO-BAG CHECKLIST -->
+    <h2>🎒 Go-Bag Checklist</h2>
+    <p>Pack a small bag and keep it hidden or at your trusted contact's home. Include:</p>
+    <ul class="checklist">
+        <li>Aadhaar Card / Voter ID (originals or photocopies)</li>
+        <li>Marriage Certificate (if applicable)</li>
+        <li>Birth certificates of children</li>
+        <li>Medical records / prescriptions</li>
+        <li>Bank passbook / ATM card</li>
+        <li>Some cash (at least ₹2,000-5,000)</li>
+        <li>Phone charger</li>
+        <li>Change of clothes for yourself (and children)</li>
+        <li>Any legal documents (property papers, FIR copies, etc.)</li>
+        <li>Medications (if on regular medication)</li>
+        <li>Keys to a safe location (if available)</li>
+    </ul>
+
+    <!-- EVIDENCE PRESERVATION -->
+    <h2>📱 Evidence Preservation</h2>
+    <p>These steps will strengthen your legal case. Do them OUTSIDE this app:</p>
+    <ul class="checklist">
+        <li>Screenshot threatening WhatsApp / SMS messages → forward to trusted contact</li>
+        <li>Photograph any injuries (even old ones) → send to trusted contact's email</li>
+        <li>Keep a diary of incidents (dates, what happened, any witnesses)</li>
+        <li>Save medical bills, hospital visit records</li>
+        <li>Note names and contact details of witnesses (neighbours, family members)</li>
+        <li>If possible, audio record threats (check local admissibility — generally allowed in India)</li>
+    </ul>
+
+    <!-- CODE WORD SYSTEM -->
+    <h2>🔐 Code Word System</h2>
+    <p>Agree on a code word with your trusted contact that means "I need help immediately":</p>
+    <div class="contact-card">
+        <strong>My Code Word:</strong> _______________<br>
+        <em>Example: "Can you bring the red dupatta?" or "I need that recipe."</em><br><br>
+        <strong>When I use this word, my trusted contact will:</strong><br>
+        ☐ Call the police (100)<br>
+        ☐ Come to my location<br>
+        ☐ Call Women Helpline (181) on my behalf
+    </div>
+
+    <!-- LEGAL RIGHTS REMINDER -->
+    <h2>⚖️ Your Legal Rights</h2>
+    <ul>
+        <li><strong>Right to Shared Household (Section 17):</strong> You CANNOT be evicted from the shared household, even if you don't own it.</li>
+        <li><strong>Protection Order (Section 18):</strong> The court can restrain the abuser from contacting you or entering your home.</li>
+        <li><strong>Monetary Relief (Section 20):</strong> You can claim maintenance, medical expenses, and compensation.</li>
+        {% if children_involved %}
+        <li><strong>Custody of Children (Section 21):</strong> You can seek temporary custody to protect your children.</li>
+        {% endif %}
+        <li><strong>Free Legal Aid:</strong> If your income is below ₹25,000/month, you are entitled to free legal representation through KSLSA.</li>
+    </ul>
+
+    <div class="footer-note">
+        Generated by Sahayak — Last Mile Justice Navigator<br>
+        This is a safety planning document, not legal advice. Please consult a lawyer or Protection Officer for formal legal proceedings.<br>
+        <strong>Remember: Your safety matters. You are not alone.</strong>
+    </div>
+</body>
+</html>

@@ -7,9 +7,13 @@
    npm install
    ```
 
-2. **Set up Firebase**
-   - Copy your Firebase config to `src/utils/firebase.js`
-   - Replace all placeholder values with your actual credentials
+2. **Set up Amazon Cognito**
+   - Follow the [Cognito Setup Guide](./COGNITO_SETUP.md)
+   - Copy your Cognito credentials to `.env.local`:
+     ```bash
+     cp .env.example .env.local
+     # Then fill in VITE_COGNITO_* variables
+     ```
 
 3. **Start the development server**
    ```bash
@@ -23,8 +27,11 @@
 
 ### ✅ Authentication Pages
 - **Landing Page** (`/`) - Public homepage with features overview
-- **Sign Up** (`/signup`) - Create account with Firebase
-- **Login** (`/login`) - Sign in with email/password or anonymously
+- **Sign Up** (`/signup`) - Create account with Cognito
+- **Confirm Signup** (`/confirm-signup`) - Verify email with code
+- **Login** (`/login`) - Sign in with email/password
+- **Forgot Password** (`/forgot-password`) - Initiate password reset
+- **Confirm Reset Password** (`/confirm-reset-password`) - Complete password reset
 - **Protected Chat** (`/chat`) - Requires authentication
 
 ### ✅ Design System
@@ -37,8 +44,14 @@
 ### ✅ Authentication Flow
 1. User lands on landing page
 2. User clicks "Sign Up" or "Login"
-3. On signup: Creates Firebase account → Redirects to chat
-4. On login: Authenticates with Firebase → Redirects to chat
+3. **On signup**: 
+   - Creates Cognito account
+   - Sends verification email
+   - User confirms with code
+   - Auto sign-in or redirects to login
+4. **On login**: 
+   - Authenticates with Cognito
+   - Redirects to chat
 5. Chat page checks auth status
 6. Logout button clears session and redirects to login
 
@@ -54,19 +67,25 @@ Shows:
 ### Login Page
 Features:
 - Email/password form
-- Anonymous login option
-- Links to signup
+- Links to signup and password reset
 - Sidebar with help information
-- Error messages and validation
+- Error messages for different error types
 
 ### Sign Up Page
 Features:
 - Email field
-- Password field with min 6 chars
+- Password field with requirements
 - Confirm password field
 - Terms checkbox
+- Auto-validation before submission
 - Links to login
-- Sidebar with benefits
+
+### Confirm Signup Page
+Features:
+- Email confirmation input
+- 6-digit code entry
+- Auto sign-in after confirmation
+- Help text for code delivery
 
 ### Chat Page (Protected)
 Shows:
@@ -74,14 +93,23 @@ Shows:
 - Chat messages area
 - Input bar for messages
 - Language selector
-- **NEW:** Logout button in header
+- Logout button in header
+
+### Password Reset Flow
+- Email-based code verification
+- 2-step process: verify code, then set new password
+- Auto-redirect to login after reset
 
 ## Environment Variables
 
-No `.env` file needed! Firebase credentials go directly in:
+Required for Cognito:
 ```
-src/utils/firebase.js
+VITE_COGNITO_USER_POOL_ID=us-east-1_xxxxxxxxx
+VITE_COGNITO_CLIENT_ID=your_client_id_here
+VITE_COGNITO_REGION=us-east-1
 ```
+
+Copy ``.env.example`` to ``.env.local`` and fill in your Cognito details.
 
 ## Browser Support
 
@@ -92,10 +120,9 @@ src/utils/firebase.js
 
 ## Next Steps
 
-1. **Configure Firebase Project**
-   - Enable Email/Password auth
-   - Enable Anonymous auth
-   - Add users for testing
+1. **Complete Cognito Setup**
+   - Follow [COGNITO_SETUP.md](./COGNITO_SETUP.md) for detailed instructions
+   - Test signup, login, and password reset flows
 
 2. **Connect to Backend**
    - Update `src/hooks/useChat.js` API endpoints
@@ -106,12 +133,18 @@ src/utils/firebase.js
    - Modify sidebar help text
    - Adjust colors in `src/index.css`
 
+4. **Deployment**
+   - Update callback URLs in Cognito App Client settings
+   - Update environment variables for production
+   - Configure your domain
+
 ## Troubleshooting
 
-### Firebase Config Not Working
-- Verify all fields are filled in `src/utils/firebase.js`
-- Check Firebase project ID matches
-- Ensure authentication methods are enabled in Firebase Console
+### Cognito Config Not Working
+- Verify all VITE_COGNITO_* variables are filled in `.env.local`
+- Check User Pool ID format: `region_randomstring`
+- Ensure Client ID is correct (not Client Secret)
+- Restart dev server after changing `.env.local`
 
 ### Routes Not Loading
 - React Router is set up in `App.jsx`
@@ -119,31 +152,62 @@ src/utils/firebase.js
 - Check browser console for errors
 
 ### Auth Not Persisting
-- Firebase SDK handles persistence automatically
-- Check browser localStorage isn't disabled
-- Verify Firebase project security rules aren't blocking
+- Amplify handles session persistence automatically
+- Check browser localStorage/sessionStorage isn't disabled
+- Verify Cognito User Pool settings
+
+### Email Codes Not Arriving
+- Check spam folder
+- Verify email address is correct
+- Wait 1-2 minutes for delivery (especially first time)
+- Check email quota (Cognito: 50/day without SES)
+
+### "Callback URL mismatch"
+- Add `http://localhost:5173/` to Cognito App Client settings
+- Include protocol and trailing slash
+- Add production domains before deploying
+
+## Authentication Stack
+
+Sahayak uses Amazon Cognito with AWS Amplify. Key details:
+
+**Authentication Provider**
+- `aws-amplify/auth` library
+
+**Auth Context**
+- Amplify Hub for state changes + `getCurrentUser()`
+
+**Environment Variables**
+- `VITE_COGNITO_USER_POOL_ID`
+- `VITE_COGNITO_CLIENT_ID`
+- `VITE_COGNITO_REGION`
+
+**Dependencies**
+- `aws-amplify` package
 
 ## File Changes Made
 
-✅ **Created:**
-- `src/components/ChatApp.jsx` - Separated chat logic with auth
-- `src/components/ProtectedRoute.jsx` - Route protection
-- `src/components/LandingPage.jsx` - Landing page
-- `src/components/LoginPage.jsx` - Login form
-- `src/components/SignupPage.jsx` - Signup form
-- `src/components/AuthPages.css` - Auth styling
-- `src/components/LandingPage.css` - Landing styling
-- `src/hooks/useAuth.js` - Auth context
-- `src/utils/firebase.js` - Firebase config
+✅ **Modified:**
+- `package.json` - Includes `aws-amplify`
+- `src/utils/cognito.js` - Cognito configuration
+- `src/hooks/useAuth.jsx` - Amplify Hub + getCurrentUser
+- `src/hooks/useAuth.js` - Amplify Hub + getCurrentUser
+- `src/components/LoginPage.jsx` - Uses `signIn` from `aws-amplify/auth`
+- `src/components/SignupPage.jsx` - Uses `signUp` + `confirmSignUp`
+- `src/components/ForgotPasswordPage.jsx` - Uses `resetPassword`
+- `src/App.jsx` - Includes confirmation routes
+- `.env.example` - Cognito variables
+- `QUICK_START.md` - Updated this file
 
-✅ **Updated:**
-- `src/App.jsx` - Router setup with protected routes
-- `src/index.css` - Added logout button styles
-- `package.json` - Added react-router-dom
+✅ **Created:**
+- `src/components/ConfirmSignupPage.jsx` - Email verification page
+- `src/components/ConfirmResetPasswordPage.jsx` - Password reset completion
+- `COGNITO_SETUP.md` - Detailed Cognito setup guide
 
 ## Support
 
 For issues with:
-- **Firebase**: Check [Firebase Documentation](https://firebase.google.com/docs)
+- **Cognito**: Check [COGNITO_SETUP.md](./COGNITO_SETUP.md) or [AWS Cognito Documentation](https://docs.aws.amazon.com/cognito/)
 - **React Router**: Check [Router Documentation](https://reactrouter.com)
 - **Styling**: All CSS is in component `.css` files
+- **Amplify**: Check [AWS Amplify Documentation](https://docs.amplify.aws/react/)

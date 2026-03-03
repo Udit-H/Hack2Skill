@@ -1,9 +1,8 @@
 import { useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
-import { sendPasswordResetEmail } from 'firebase/auth';
+import { resetPassword, confirmResetPassword } from 'aws-amplify/auth';
 import { useLanguage } from '../hooks/useLanguage.jsx';
 import { getTranslation } from '../utils/translations.js';
-import { auth } from '../utils/firebase';
 import './AuthPages.css';
 
 export default function ForgotPasswordPage() {
@@ -23,14 +22,22 @@ export default function ForgotPasswordPage() {
     setLoading(true);
 
     try {
-      await sendPasswordResetEmail(auth, email);
+      // Initiate password reset flow - Cognito sends code to email
+      await resetPassword({ username: email });
       setSuccess(t('auth.reset_email_sent'));
+      // Store email for confirmation step
+      sessionStorage.setItem('resetPasswordEmail', email);
+      sessionStorage.setItem('awaitingResetCode', 'true');
       setEmail('');
       setTimeout(() => {
-        navigate('/login');
-      }, 3000);
+        navigate('/confirm-reset-password');
+      }, 2000);
     } catch (err) {
-      setError(err.message || 'Failed to send reset email');
+      if (err.code === 'UserNotFoundException') {
+        setError('No account found with this email.');
+      } else {
+        setError(err.message || 'Failed to send reset email');
+      }
     } finally {
       setLoading(false);
     }

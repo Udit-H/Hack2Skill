@@ -1,6 +1,7 @@
 import { useState, useEffect, useContext, createContext } from 'react';
-import { onAuthStateChanged, signOut } from 'firebase/auth';
-import { auth } from '../utils/firebase';
+import { signOut } from 'aws-amplify/auth';
+import { Hub } from 'aws-amplify/utils';
+import { getCurrentUser } from 'aws-amplify/auth';
 
 const AuthContext = createContext();
 
@@ -9,16 +10,48 @@ export function AuthProvider({ children }) {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    const unsubscribe = onAuthStateChanged(auth, (currentUser) => {
-      setUser(currentUser);
-      setLoading(false);
+    // Check initial auth state
+    const checkAuthState = async () => {
+      try {
+        const currentUser = await getCurrentUser();
+        setUser(currentUser);
+      } catch (err) {
+        // Not authenticated
+        setUser(null);
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    checkAuthState();
+
+    // Subscribe to auth state changes via Amplify Hub
+    const hubListener = Hub.listen('auth', ({ payload }) => {
+      switch (payload.event) {
+        case 'signedIn':
+          getCurrentUser().then(user => setUser(user)).catch(() => setUser(null));
+          break;
+        case 'signedOut':
+          setUser(null);
+          break;
+        case 'tokenRefresh':
+          // Token refreshed, user object remains valid
+          break;
+        default:
+          break;
+      }
     });
 
-    return unsubscribe;
+    return () => hubListener();
   }, []);
 
   const logout = async () => {
-    await signOut(auth);
+    try {
+      await signOut();
+      setUser(null);
+    } catch (err) {
+      console.error('Logout error:', err);
+    }
   };
 
   return (

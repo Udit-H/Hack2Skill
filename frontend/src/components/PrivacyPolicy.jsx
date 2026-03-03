@@ -21,7 +21,7 @@ export default function PrivacyPolicy() {
           <h2>2. Information We Collect</h2>
           <h3>Account Information</h3>
           <ul>
-            <li>Email address (if you create an account)</li>
+            <li>Email address</li>
             <li>Authentication credentials</li>
             <li>Profile information you provide</li>
           </ul>
@@ -61,7 +61,7 @@ export default function PrivacyPolicy() {
           </p>
           <ul>
             <li>End-to-end encryption for sensitive communications</li>
-            <li>Secure Firebase authentication</li>
+            <li>Secure Amazon Cognito authentication</li>
             <li>Regular security audits</li>
             <li>Limited employee access to user data</li>
           </ul>
@@ -101,35 +101,10 @@ export default function PrivacyPolicy() {
         </section>
 
         <section>
-          <h2>8. Children's Privacy</h2>
-          <p>
-            Sahayak is not intended for users under 13 years of age. We do not knowingly collect personal information from children. If you believe a child has provided us with personal information, please contact us immediately.
-          </p>
-        </section>
-
-        <section>
-          <h2>9. International Users</h2>
-          <p>
-            Your information may be transferred to and processed in countries other than your own. We ensure appropriate safeguards are in place for international data transfers.
-          </p>
-        </section>
-
-        <section>
-          <h2>10. Changes to Privacy Policy</h2>
+          <h2>8. Changes to Privacy Policy</h2>
           <p>
             We may update this Privacy Policy periodically. We will notify you of significant changes via email or in-app notification. Your continued use after changes constitutes acceptance.
           </p>
-        </section>
-
-        <section>
-          <h2>11. Contact Us</h2>
-          <p>
-            For privacy-related questions or to exercise your rights, contact us at:
-          </p>
-          <ul>
-            <li>Email: privacy@sahayak.example.com</li>
-            <li>Subject Line: "Privacy Request"</li>
-          </ul>
         </section>
 
         <section className="emphasis">

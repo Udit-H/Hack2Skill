@@ -1,9 +1,8 @@
 import { useState } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
-import { createUserWithEmailAndPassword } from 'firebase/auth';
+import { signUp, confirmSignUp, autoSignIn } from 'aws-amplify/auth';
 import { useLanguage } from '../hooks/useLanguage.jsx';
 import { getTranslation } from '../utils/translations.js';
-import { auth } from '../utils/firebase';
 import './AuthPages.css';
 
 export default function SignupPage() {
@@ -22,8 +21,8 @@ export default function SignupPage() {
       setError(t('auth.all_fields_required'));
       return false;
     }
-    if (password.length < 6) {
-      setError(t('auth.min_6_chars'));
+    if (password.length < 12) {
+      setError('Password must be at least 12 characters long.');
       return false;
     }
     if (password !== confirmPassword) {
@@ -42,10 +41,37 @@ export default function SignupPage() {
     setLoading(true);
 
     try {
-      await createUserWithEmailAndPassword(auth, email, password);
-      navigate('/chat');
+      // Step 1: Sign up user in Cognito User Pool
+      const { userId } = await signUp({
+        username: email,
+        password,
+        userAttributes: {
+          email,
+        },
+      });
+
+      // Step 2: Confirm user (Cognito will send verification code to email)
+      // The app should navigate to a confirmation page asking for the code
+      // For now, we'll try auto-sign-in if configured
+      try {
+        await autoSignIn();
+        navigate('/chat');
+      } catch (autoSignInErr) {
+        // If auto sign-in fails, user needs to confirm email first
+        // Store userId in sessionStorage for the confirmation page
+        sessionStorage.setItem('waitingForEmailConfirmation', 'true');
+        sessionStorage.setItem('userEmail', email);
+        navigate('/confirm-signup');
+      }
     } catch (err) {
-      setError(err.message || 'Failed to create account');
+      // Map Cognito errors to user-friendly messages
+      if (err.code === 'UsernameExistsException') {
+        setError('An account with this email already exists.');
+      } else if (err.code === 'InvalidPasswordException') {
+        setError('Password must be at least 12 characters with uppercase, lowercase, number, and special character (e.g., !@#$%^&*).');
+      } else {
+        setError(err.message || 'Failed to create account');
+      }
     } finally {
       setLoading(false);
     }
@@ -106,7 +132,7 @@ export default function SignupPage() {
               required
               disabled={loading}
             />
-            <small>{t('auth.password_min')}</small>
+            <small>At least 12 characters: uppercase, lowercase, number, special character (!@#$%^&*)</small>
           </div>
 
           <div className="form-group">

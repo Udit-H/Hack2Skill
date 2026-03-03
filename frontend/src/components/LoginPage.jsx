@@ -1,9 +1,8 @@
 import { useState } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
-import { signInWithEmailAndPassword, signInAnonymously } from 'firebase/auth';
+import { signIn } from 'aws-amplify/auth';
 import { useLanguage } from '../hooks/useLanguage.jsx';
 import { getTranslation } from '../utils/translations.js';
-import { auth } from '../utils/firebase';
 import './AuthPages.css';
 
 export default function LoginPage() {
@@ -22,10 +21,20 @@ export default function LoginPage() {
     setLoading(true);
 
     try {
-      await signInWithEmailAndPassword(auth, email, password);
+      await signIn({ username: email, password });
       navigate('/chat');
     } catch (err) {
-      setError(err.message || 'Failed to login');
+      // Map Cognito errors to user-friendly messages
+      const errorMessage = err.message || 'Failed to login';
+      if (err.code === 'UserNotConfirmedException') {
+        setError('Please verify your email before logging in.');
+      } else if (err.code === 'NotAuthorizedException' || err.code === 'InvalidPasswordException') {
+        setError('Invalid email or password.');
+      } else if (err.code === 'UserNotFoundException') {
+        setError('No account found with this email.');
+      } else {
+        setError(errorMessage);
+      }
     } finally {
       setLoading(false);
     }
@@ -36,11 +45,14 @@ export default function LoginPage() {
     setLoading(true);
 
     try {
-      await signInAnonymously(auth);
-      navigate('/chat');
+      // Note: Cognito does not support truly anonymous auth.
+      // This creates a temporary guest session.
+      // For a better experience, consider allowing guest access at the app level
+      // rather than at the auth level.
+      alert('Anonymous login is not available with Cognito. Please create an account.');
+      setLoading(false);
     } catch (err) {
       setError(err.message || 'Failed to login anonymously');
-    } finally {
       setLoading(false);
     }
   };
@@ -114,15 +126,6 @@ export default function LoginPage() {
         <div className="auth-divider">
           <span>or</span>
         </div>
-
-        {/* Anonymous Login */}
-        <button
-          onClick={handleAnonymousLogin}
-          className="btn btn-secondary btn-block"
-          disabled={loading}
-        >
-          {loading ? 'Connecting...' : t('auth.continue_without_login')}
-        </button>
 
         {/* Sign Up Link */}
         <p className="auth-switch">

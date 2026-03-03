@@ -8,7 +8,7 @@ export default function TermsOfService() {
         <Link to="/" className="back-link">← Back to Home</Link>
         
         <h1>Terms of Service</h1>
-        <p className="last-updated">Last Updated: February 28, 2026</p>
+        <p className="last-updated">Last Updated: March 03, 2026</p>
 
         <section>
           <h2>1. Acceptance of Terms</h2>
@@ -43,7 +43,7 @@ export default function TermsOfService() {
         <section>
           <h2>4. Emergency Situations</h2>
           <p>
-            <strong>Important:</strong> If you are in immediate danger, please contact emergency services (911 or local emergency number) directly. Sahayak is a support tool but does not replace emergency response services.
+            <strong>Important:</strong> If you are in immediate danger, please contact emergency services directly. Sahayak is a support tool but does not replace emergency response services.
           </p>
         </section>
 
@@ -65,13 +65,6 @@ export default function TermsOfService() {
           <h2>7. Changes to Terms</h2>
           <p>
             We reserve the right to modify these terms at any time. Users will be notified of significant changes. Continued use of the service after changes constitutes acceptance of the modified terms.
-          </p>
-        </section>
-
-        <section>
-          <h2>8. Contact</h2>
-          <p>
-            For questions about these Terms of Service, please contact us at support@sahayak.example.com
           </p>
         </section>
       </div>

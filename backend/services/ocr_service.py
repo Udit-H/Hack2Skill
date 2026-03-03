@@ -9,6 +9,7 @@ import base64
 import time
 from typing import Union, Dict, Optional
 from pathlib import Path
+from urllib.parse import urlparse
 
 import boto3
 from botocore.exceptions import ClientError
@@ -54,11 +55,6 @@ class DocumentIntelligenceService:
         """
         Initializes the Textract and S3 clients.
 
-        Credentials are resolved in this order:
-        1. Explicit kwargs (good for local dev)
-        2. Environment variables: AWS_ACCESS_KEY_ID, AWS_SECRET_ACCESS_KEY
-        3. IAM role attached to EC2/ECS (recommended for production)
-
         Args:
             region_name:            AWS region, defaults to AWS_REGION env var or 'ap-south-1'
             s3_bucket:              S3 bucket name for PDF uploads (required for PDF analysis)
@@ -85,7 +81,6 @@ class DocumentIntelligenceService:
         source: Union[str, bytes, Path],
         is_url: bool = False,
         is_s3_key: bool = False,
-        model_id: str = "prebuilt-read",  # kept for interface compatibility, unused
     ) -> Dict:
         """
         Analyzes a document and returns extracted text and metadata.
@@ -112,16 +107,34 @@ class DocumentIntelligenceService:
                 "confidence_avg": 0.97
             }
         """
+              
+        suffix = ""
         if is_url:
+            if isinstance(source, str):
+                suffix = Path(urlparse(source).path).suffix.lower()
             source = await self._download_url(source)
 
-        # Determine file type to choose sync vs async path
-        suffix = self._get_suffix(source, is_s3_key)
+        # fallback infer from magic bytes if suffix still unknown
+        if not suffix:
+            suffix = self._get_suffix(source, is_s3_key)
+        if not suffix and isinstance(source, bytes):
+            suffix = self._infer_suffix_from_bytes(source)
 
         if suffix in self.ASYNC_REQUIRED_TYPES or is_s3_key:
             return await self._analyze_async(source, is_s3_key=is_s3_key)
-        else:
-            return await self._analyze_sync(source)
+        return await self._analyze_sync(source)
+
+
+    def _infer_suffix_from_bytes(self, data: bytes) -> str:
+        if data.startswith(b"%PDF"):
+            return ".pdf"
+        if data.startswith(b"\x89PNG\r\n\x1a\n"):
+            return ".png"
+        if data.startswith(b"\xFF\xD8\xFF"):
+            return ".jpg"
+        if data[:4] in (b"II*\x00", b"MM\x00*"):
+            return ".tiff"
+        return ""
 
     # -------------------------------------------------------------------------
     # Sync path — images only (JPEG, PNG, TIFF)

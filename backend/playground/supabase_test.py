@@ -8,7 +8,7 @@ sys.path.insert(0, os.path.join(os.path.dirname(__file__), 'backend'))
 from dotenv import load_dotenv
 load_dotenv()
 
-from core.shelter_service import ShelterService
+from services.shelter_service import ShelterService
 from models.enums import CrisisCategory
 
 async def test_shelter_service():

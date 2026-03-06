@@ -2,6 +2,9 @@ import os
 import re
 import jinja2
 import logging
+import json
+import urllib.parse
+import urllib.request
 
 from models.session import SessionState, AgentResponse, AgentActionType, AgentType
 from models.shelter import ShelterAgentState, ShelterWorkflowStatus
@@ -71,6 +74,32 @@ def _geocode_location(location_text: str) -> dict | None:
     # Fallback: central Bengaluru
     if any(city in text for city in ["bengaluru", "bangalore", "blr"]):
         return {"lat": 12.9716, "lng": 77.5946}
+
+    # Final fallback: OpenStreetMap Nominatim geocoding
+    # Restrict query to Bengaluru when city is not explicit to improve hit rate
+    query_text = location_text.strip()
+    if not any(city in text for city in ["bengaluru", "bangalore", "blr", "karnataka"]):
+        query_text = f"{query_text}, Bengaluru, Karnataka, India"
+
+    try:
+        url = (
+            "https://nominatim.openstreetmap.org/search?"
+            + urllib.parse.urlencode({"q": query_text, "format": "json", "limit": 1})
+        )
+        request = urllib.request.Request(
+            url,
+            headers={"User-Agent": "SahayakShelterAgent/1.0 (hackathon)"},
+        )
+        with urllib.request.urlopen(request, timeout=4) as response:
+            payload = json.loads(response.read().decode("utf-8"))
+            if payload:
+                lat = float(payload[0]["lat"])
+                lng = float(payload[0]["lon"])
+                logging.info(f"[GEOCODE] Nominatim matched '{location_text}' → ({lat}, {lng})")
+                return {"lat": lat, "lng": lng}
+    except Exception as e:
+        logging.warning(f"[GEOCODE] Nominatim fallback failed for '{location_text}': {e}")
+
     return None
 
 def _match_shelter_selection(user_message: str, shelters: list) -> int | None:
@@ -234,6 +263,16 @@ class ShelterAgent:
                 if not current_state.user_location_text:
                     current_state.user_location_text = f"{raw_coords['lat']},{raw_coords['lng']}"
                 logging.info(f"[SHELTER] Extracted GPS from user message → {raw_coords}")
+
+        # If GPS already exists (from browser location access), normalize dependent fields
+        if current_state.user_coordinates:
+            if not current_state.user_location_text:
+                current_state.user_location_text = (
+                    f"{current_state.user_coordinates.get('lat')},"
+                    f"{current_state.user_coordinates.get('lng')}"
+                )
+            if not current_state.user_preferences:
+                current_state.user_preferences = "No specific requirements"
         
         while loop_count < max_loops:
             loop_count += 1
@@ -246,23 +285,20 @@ class ShelterAgent:
                     logging.info(f"[SHELTER] Auto-geocoded '{current_state.user_location_text}' → {coords}")
             
             # 1. DB RETRIEVAL PHASE — trigger if we have coords + prefs and no shelters yet
-            needs_db_search = (
-                current_state.user_coordinates 
-                and current_state.user_preferences 
-                and not current_state.matched_shelters
-            )
+            needs_db_search = current_state.user_coordinates and not current_state.matched_shelters
             if needs_db_search:
                 db_query_attempted = True    
                 
                 # Default Bengaluru Coordinates
                 lat = current_state.user_coordinates.get('lat', 12.9803) 
                 lng = current_state.user_coordinates.get('lng', 77.5688)
+                search_preferences = current_state.user_preferences or "No specific requirements"
                 
                 try:
                     shelters = await self.db_service.find_appropriate_shelters(
                         lat=lat, lng=lng, 
                         crisis_category=triage.category, 
-                        preferences=current_state.user_preferences
+                        preferences=search_preferences
                     )
                     current_state.matched_shelters = shelters
                     print(f"[DB RESULT]: {len(shelters) if shelters else 0} shelters found")
@@ -270,6 +306,10 @@ class ShelterAgent:
                     logging.error(f"[SHELTER] DB search failed: {e}")
                     current_state.matched_shelters = []
                     print(f"[DB ERROR]: {e} — will ask user to try again")
+
+            # If DB already returned shelters, bypass extra waiting prompts.
+            if current_state.matched_shelters and not current_state.selected_shelter_ids:
+                break
 
             # 2. PROMPT GENERATION
             memory_context = memory_manager.get_memory_context()

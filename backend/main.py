@@ -208,12 +208,16 @@ async def chat(request: Request, req: ChatRequest):
     orchestrator = sess["orchestrator"]
 
     try:
-        # Inject GPS coordinates into shelter state if available
-        if req.latitude and req.longitude:
+        # Inject GPS coordinates from client location access when provided
+        if req.latitude is not None and req.longitude is not None:
             if not state.shelter:
                 from models.shelter import ShelterAgentState
                 state.shelter = ShelterAgentState()
             state.shelter.user_coordinates = {"lat": req.latitude, "lng": req.longitude}
+            if not state.shelter.user_location_text:
+                state.shelter.user_location_text = f"{req.latitude},{req.longitude}"
+            if not state.shelter.user_preferences:
+                state.shelter.user_preferences = "No specific requirements"
 
         # Route through orchestrator — it handles triage, shelter, legal, drafting
         reply = await orchestrator.handle_turn(

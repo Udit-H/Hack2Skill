@@ -17,6 +17,28 @@ export function useChat() {
     const initialized = useRef(false);
     const userCoords = useRef(null);
 
+    const requestCurrentCoords = useCallback(() => {
+        return new Promise((resolve) => {
+            if (!navigator.geolocation) {
+                resolve(null);
+                return;
+            }
+
+            navigator.geolocation.getCurrentPosition(
+                (pos) => {
+                    const coords = {
+                        latitude: pos.coords.latitude,
+                        longitude: pos.coords.longitude,
+                    };
+                    userCoords.current = coords;
+                    resolve(coords);
+                },
+                () => resolve(null),
+                { enableHighAccuracy: true, timeout: 10000 }
+            );
+        });
+    }, []);
+
     // Get user ID from authenticated user
     // Cognito user object has userId or username field
     // For anonymous users, generate a browser-specific ID
@@ -141,7 +163,12 @@ export function useChat() {
             setIsLoading(true);
 
             try {
-                const response = await sendMessage(sessionId, text, language, userCoords.current, userId);
+                let coordsForRequest = userCoords.current;
+                if (!coordsForRequest) {
+                    coordsForRequest = await requestCurrentCoords();
+                }
+
+                const response = await sendMessage(sessionId, text, language, coordsForRequest, userId);
 
                 const assistantMsg = {
                     id: Date.now() + 1,
@@ -161,7 +188,7 @@ export function useChat() {
                 setIsLoading(false);
             }
         },
-        [sessionId, isLoading, language]
+        [sessionId, isLoading, language, requestCurrentCoords, userId]
     );
 
     const upload = useCallback(

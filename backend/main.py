@@ -7,25 +7,33 @@ Connects the React frontend to the multi-agent orchestrator.
 
 import uuid
 import os
+import tempfile
 import asyncio
 from contextlib import asynccontextmanager
 
+# ─── MSYS2 DLL Setup for WeasyPrint on Windows ──────────────────
+# Must happen BEFORE any weasyprint imports
+msys_path = r"C:\msys64\ucrt64\bin"
+if os.path.exists(msys_path):
+    os.add_dll_directory(msys_path)
+    print(f"✅ MSYS2 DLL directory added: {msys_path}")
+else:
+    print(f"⚠️  MSYS2 path not found — WebAssembly PDF generation may fail on Windows.")
+
 from fastapi import FastAPI, UploadFile, File, Form, HTTPException, Request
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import FileResponse, JSONResponse
+from pydantic import BaseModel
+from typing import Optional
 from slowapi import Limiter
 from slowapi.util import get_remote_address
 from slowapi.errors import RateLimitExceeded
 from slowapi.middleware import SlowAPIMiddleware
-from pydantic import BaseModel
-from typing import Optional
 
 # Internal imports
 from models.session import SessionState, AgentType, AgentActionType
-from models.triage import TriageState
-from models.legal import LegalAgentState, WorkflowStatus
-from models.enums import CrisisCategory
 from core.memory import MemoryManager
-from agents.legal_agent import LegalAgent
+from core.orchestrator import Orchestrator
 
 # ---------------------------------------------------------------------------
 # Rate Limiter Configuration
@@ -42,33 +50,20 @@ sessions: dict[str, dict] = {}
 def get_or_create_session(session_id: str) -> dict:
     """Get or lazily create session components."""
     if session_id not in sessions:
-        # Initialize a fresh session with mocked triage (eviction focus)
         memory = MemoryManager(session_id)
-        legal_agent = LegalAgent()
+        orchestrator = Orchestrator()
 
+        # Session starts at ORCHESTRATOR — triage agent takes over first
         session_state = SessionState(
             session_id=session_id,
             user_phone=None,
-            active_agent=AgentType.LEGAL,
-            triage=TriageState(
-                category=CrisisCategory.ILLEGAL_EVICTION,
-                urgency_level=4,
-                needs_immediate_shelter=False,
-                physical_danger_present=False,
-                incident_summary="User is seeking help with an eviction-related issue.",
-                has_ownership_claim=False,
-                is_financially_destitute=False,
-            ),
-            legal=LegalAgentState(
-                workflow_status=WorkflowStatus.AWAITING_DOCS,
-                drafts_to_generate=[],
-            ),
+            active_agent=AgentType.ORCHESTRATOR,
         )
 
         sessions[session_id] = {
             "state": session_state,
             "memory": memory,
-            "legal_agent": legal_agent,
+            "orchestrator": orchestrator,
         }
 
     return sessions[session_id]
@@ -88,15 +83,19 @@ async def lifespan(app: FastAPI):
 app = FastAPI(
     title="Sahayak API",
     description="Last Mile Justice Navigator — Backend API",
-    version="0.1.0",
+    version="0.2.0",
     lifespan=lifespan,
 )
 
 # Add rate limiter state to app
 app.state.limiter = limiter
-app.add_exception_handler(RateLimitExceeded, lambda request, exc: {
-    "detail": "Rate limit exceeded. Please try again later."
-})
+app.add_exception_handler(
+    RateLimitExceeded,
+    lambda request, exc: JSONResponse(
+        status_code=429,
+        content={"detail": "Rate limit exceeded. Please try again later."}
+    )
+)
 
 # CORS Configuration (improved for production and local dev)
 cors_origins = os.getenv("CORS_ORIGINS", "http://localhost:5173,http://127.0.0.1:5173").split(",")
@@ -120,11 +119,17 @@ class ChatRequest(BaseModel):
     session_id: str
     message: str
     language: str = "en"
+    latitude: Optional[float] = None
+    longitude: Optional[float] = None
 
 
 class ChatResponse(BaseModel):
     reply: str
     agent_info: dict
+    progress_status: Optional[str] = None  # Agent operation status (searching, drafting, etc)
+    is_loading: bool = False  # True when agent is actively processing
+    error_message: Optional[str] = None  # Error details for UI display
+    download_urls: Optional[list] = None  # List of downloadable document URLs
 
 
 class SessionResponse(BaseModel):
@@ -141,7 +146,6 @@ class PanicRequest(BaseModel):
 # Endpoints
 # ---------------------------------------------------------------------------
 
-
 @app.post("/api/session", response_model=SessionResponse)
 @limiter.limit("10/minute")
 async def create_session(request: Request):
@@ -152,9 +156,7 @@ async def create_session(request: Request):
     return SessionResponse(
         session_id=session_id,
         active_agent=sess["state"].active_agent.value,
-        workflow_status=sess["state"].legal.workflow_status.value
-        if sess["state"].legal
-        else "unknown",
+        workflow_status="triage_pending",
     )
 
 
@@ -166,12 +168,15 @@ async def get_session(request: Request, session_id: str):
         raise HTTPException(status_code=404, detail="Session not found")
 
     sess = sessions[session_id]
+    state = sess["state"]
+    
+    # Determine workflow status from active agent's state
+    workflow_status = _get_workflow_status(state)
+
     return SessionResponse(
         session_id=session_id,
-        active_agent=sess["state"].active_agent.value,
-        workflow_status=sess["state"].legal.workflow_status.value
-        if sess["state"].legal
-        else "unknown",
+        active_agent=state.active_agent.value,
+        workflow_status=workflow_status,
     )
 
 
@@ -182,46 +187,53 @@ async def chat(request: Request, req: ChatRequest):
     sess = get_or_create_session(req.session_id)
     state = sess["state"]
     memory = sess["memory"]
-    legal_agent = sess["legal_agent"]
+    orchestrator = sess["orchestrator"]
 
     try:
-        # Route to the active agent
-        if state.active_agent == AgentType.LEGAL:
-            response = await legal_agent.process_turn(
-                session=state,
-                user_message=req.message,
-                memory_manager=memory,
-                language=req.language,
-            )
+        # Inject GPS coordinates into shelter state if available
+        if req.latitude and req.longitude:
+            if not state.shelter:
+                from models.shelter import ShelterAgentState
+                state.shelter = ShelterAgentState()
+            state.shelter.user_coordinates = {"lat": req.latitude, "lng": req.longitude}
 
-            reply = response.reply_message or "I'm processing your request."
+        # Route through orchestrator — it handles triage, shelter, legal, drafting
+        reply = await orchestrator.handle_turn(
+            session=state,
+            memory_manager=memory,
+            user_message=req.message,
+        )
 
-            # Update memory
-            memory.add_turn(user_message=req.message, ai_message=reply)
+        # Update memory
+        memory.add_turn(user_message=req.message, ai_message=reply)
+        
+        # Extract progress/error info from cached agent response
+        progress_status = None
+        is_loading = False
+        error_message = None
+        download_urls = None
+        if state.last_agent_response:
+            progress_status = state.last_agent_response.get("progress_status")
+            is_loading = state.last_agent_response.get("is_loading", False)
+            error_message = state.last_agent_response.get("error_message")
+            download_urls = state.last_agent_response.get("download_urls")
 
-            return ChatResponse(
-                reply=reply,
-                agent_info={
-                    "activeAgent": state.active_agent.value,
-                    "workflowStatus": state.legal.workflow_status.value
-                    if state.legal
-                    else "unknown",
-                    "switchTriggered": response.action_type
-                    == AgentActionType.SWITCH_AGENT,
-                },
-            )
-        else:
-            # Fallback for agents not yet implemented
-            return ChatResponse(
-                reply="This agent is not yet available. Currently, only the Legal Agent is active.",
-                agent_info={
-                    "activeAgent": state.active_agent.value,
-                    "workflowStatus": "unavailable",
-                },
-            )
+        return ChatResponse(
+            reply=reply,
+            agent_info={
+                "activeAgent": state.active_agent.value,
+                "workflowStatus": _get_workflow_status(state),
+            },
+            progress_status=progress_status,
+            is_loading=is_loading,
+            error_message=error_message,
+            download_urls=download_urls,
+        )
 
     except Exception as e:
         print(f"❌ Chat error for session {req.session_id}: {e}")
+        import traceback
+        traceback.print_exc()
         raise HTTPException(status_code=500, detail=f"Agent error: {str(e)}")
 
 
@@ -280,7 +292,7 @@ async def upload_document(
     sess = get_or_create_session(session_id)
     state = sess["state"]
     memory = sess["memory"]
-    legal_agent = sess["legal_agent"]
+    orchestrator = sess["orchestrator"]
 
     # Save file temporarily
     upload_dir = "/tmp/sahayak_uploads"
@@ -291,15 +303,15 @@ async def upload_document(
         f.write(contents)
 
     try:
-        # Process through legal agent with document
-        response = await legal_agent.process_turn(
+        # Route through orchestrator with document
+        reply = await orchestrator.handle_turn(
             session=state,
+            memory_manager=memory,
             user_message=f"I am uploading my document: {file.filename}",
             document_path=file_path,
-            memory_manager=memory,
         )
 
-        # Log OCR result so we can verify it worked
+        # Log OCR result
         ocr_text = state.legal.extracted_doc_data if state.legal else None
         if ocr_text:
             preview = ocr_text[:500]
@@ -307,7 +319,6 @@ async def upload_document(
             print(f"   Length: {len(ocr_text)} chars")
             print(f"   Preview: {preview}...\n")
 
-        reply = response.reply_message or "Document received and being analyzed."
         memory.add_turn(
             user_message=f"Uploaded document: {file.filename}",
             ai_message=reply,
@@ -320,9 +331,7 @@ async def upload_document(
             "ocr_length": len(ocr_text) if ocr_text else 0,
             "agent_info": {
                 "activeAgent": state.active_agent.value,
-                "workflowStatus": state.legal.workflow_status.value
-                if state.legal
-                else "unknown",
+                "workflowStatus": _get_workflow_status(state),
             },
         }
 
@@ -333,6 +342,21 @@ async def upload_document(
         # Clean up temp file
         if os.path.exists(file_path):
             os.remove(file_path)
+
+
+@app.get("/api/drafts/{session_id}/{filename}")
+async def download_draft(session_id: str, filename: str):
+    """Download a generated PDF draft."""
+    draft_path = os.path.join(tempfile.gettempdir(), "sahayak_drafts", session_id, filename)
+    
+    if not os.path.exists(draft_path):
+        raise HTTPException(status_code=404, detail="Draft not found")
+
+    return FileResponse(
+        path=draft_path,
+        media_type="application/pdf",
+        filename=filename,
+    )
 
 
 @app.post("/api/panic")
@@ -357,4 +381,28 @@ async def panic_wipe(request: Request, req: PanicRequest):
 @limiter.limit("60/minute")
 async def health_check(request: Request):
     """Health check endpoint."""
-    return {"status": "ok", "service": "sahayak-api"}
+    return {"status": "ok", "service": "sahayak-api", "version": "0.2.0"}
+
+
+# ---------------------------------------------------------------------------
+# Helpers
+# ---------------------------------------------------------------------------
+
+def _get_workflow_status(state: SessionState) -> str:
+    """Get a human-readable workflow status from the current session state."""
+    agent = state.active_agent
+    
+    if agent == AgentType.TRIAGE and state.triage:
+        return state.triage.workflow_status.value
+    elif agent == AgentType.SHELTER and state.shelter:
+        return state.shelter.workflow_status.value
+    elif agent == AgentType.LEGAL and state.legal:
+        return state.legal.workflow_status.value
+    elif agent == AgentType.DRAFTING and state.drafting:
+        return state.drafting.workflow_status.value
+    elif agent == AgentType.COMPLETED:
+        return "completed"
+    elif agent == AgentType.ORCHESTRATOR:
+        return "routing"
+    else:
+        return "initializing"

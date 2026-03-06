@@ -8,6 +8,7 @@ import jinja2
 from config.config import Settings
 from config.config import get_settings
 from core.bedrock_client import BedrockAsyncClient
+from services.llm_service import LLMService
 
 WORKING_MEMORY_TURNS = 6
 SUMMARIZATION_THRESHOLD = WORKING_MEMORY_TURNS * 2
@@ -19,28 +20,18 @@ template_env = jinja2.Environment(loader=jinja2.FileSystemLoader(searchpath=prom
 
 class MemoryManager:
     def __init__(self, session_id: str = None):
-        self.settings = Settings()
-        # self.session_id = session_id
-        self.session_id = "abcd-1234"
+        settings = Settings()
+        self.session_id = session_id
         
         self.redis_client = redis.Redis(
-            host='redis-14324.c15.us-east-1-4.ec2.cloud.redislabs.com',
-            port=14324,
+            host=settings.redisdb.host,
+            port=settings.redisdb.port,
             decode_responses=True,
             username="default",
-            password="8MpHv6o4C1nffvl2jMu060SMI9usS7Yr",
+            password=settings.redisdb.password,
         )
         
-        settings = get_settings()
-        
-        # Initialize Bedrock client for text generation
-        boto_kwargs = {"region_name": settings.llm.aws_region}
-        if settings.llm.aws_access_key_id and settings.llm.aws_secret_access_key:
-            boto_kwargs["aws_access_key_id"] = settings.llm.aws_access_key_id
-            boto_kwargs["aws_secret_access_key"] = settings.llm.aws_secret_access_key
-        
-        bedrock_runtime = boto3.client("bedrock-runtime", **boto_kwargs)
-        self.llm_client = BedrockAsyncClient(bedrock_runtime, settings.llm.model_id)
+        self.llm = LLMService()
         
         self.template = template_env.get_template("memory.j2")
 
@@ -102,15 +93,12 @@ class MemoryManager:
         )
         
         try:
-            # Bedrock async call for summarization
-            response = await self.llm_client.chat.completions.create(
+            new_summary = await self.llm.create_completion(
                 messages=[
                     {"role": "system", "content": prompt},
                     {"role": "user", "content": "Give me an updated summary using all the relevant context given in the system prompt"}
                 ]
             )
-
-            new_summary = response.choices[0].message.content
             self.redis_client.set(self.episodic_memory_key, new_summary)
             
             # SLIDING WINDOW FIX: Do not delete everything! 

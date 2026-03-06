@@ -1,91 +1,153 @@
-import asyncio
-from fastapi import BackgroundTasks
+import logging
 from models.session import SessionState, AgentType, AgentActionType
-from models.legal import LegalAgentState
+from models.triage import TriageWorkflowStatus
+from models.shelter import ShelterWorkflowStatus
+from models.legal import WorkflowStatus as LegalWorkflowStatus
+from models.drafting import DraftingWorkflowStatus
+
+from agents.triage_agent import TriageAgent
+from agents.shelter_agent import ShelterAgent
 from agents.legal_agent import LegalAgent
-# from core.triage_agent import TriageAgent
-# from core.shelter_agent import ShelterAgent
+from agents.drafting_agent import DraftingAgent
 
 class Orchestrator:
     def __init__(self):
+        # Initialize the stateless sub-agents
         self.triage_agent = TriageAgent()
-        self.legal_agent = LegalAgent()
         self.shelter_agent = ShelterAgent()
+        self.legal_agent = LegalAgent()
+        self.drafting_agent = DraftingAgent()
 
-    # --- FOREGROUND: Fast Webhook ---
-    async def handle_incoming_webhook(self, user_id: str, message: str, doc_url: str, bg_tasks: BackgroundTasks):
-        """Called directly by FastAPI endpoint. Returns 200 OK instantly."""
+    async def handle_turn(
+        self, 
+        session: SessionState, 
+        memory_manager, 
+        user_message: str, 
+        document_path: str = None
+    ) -> str:
+        """
+        The main entry point for every single user message.
+        Evaluates state, routes to the correct agent, and handles handoffs.
+        """
         
-        # 1. Dispatch heavy lifting to Celery/BackgroundTasks
-        bg_tasks.add_task(self.background_worker, user_id, message, doc_url)
-        return {"status": "processing_in_background"}
+        # 2. EVALUATE ROUTING RULES (If Orchestrator currently holds control)
+        if session.active_agent in[AgentType.ORCHESTRATOR, AgentType.COMPLETED]:
+            self._determine_next_agent(session)
 
+        # 3. DISPATCH TO ACTIVE AGENT
+        response = await self._dispatch_to_agent(session, memory_manager, user_message, document_path)
 
-    # --- BACKGROUND: The Routing Engine ---
-    async def background_worker(self, user_id: str, message: str, doc_url: str):
-        # 1. Load Global State from Redis
-        session: SessionState = await load_session_from_redis(user_id)
+        final_reply = response.reply_message
         
-        # 2. EMERGENCY OVERRIDE CHECK (The Wow Factor)
-        if session.active_agent == AgentType.LEGAL and self._is_emergency_override(message):
-            session.active_agent = AgentType.SHELTER
-            await send_whatsapp(user_id, "I am pausing the legal work. Activating emergency shelter protocols.")
+        # Cache response for UI (progress, errors, downloads)
+        session.last_agent_response = {
+            "progress_status": response.progress_status,
+            "is_loading": response.is_loading,
+            "error_message": response.error_message,
+            "download_urls": response.download_urls,
+            "active_agent": session.active_agent.value,
+        }
 
-        # 3. ROUTE TO ACTIVE AGENT
-        agent_response = None
-        
-        if session.active_agent == AgentType.ORCHESTRATOR:
-            agent_response = await self.triage_agent.process_turn(session, message)
+        # 4. HANDLE SEAMLESS HANDOFFS (supports chained handoffs: Legal → Drafting → Completed)
+        # If the agent just finished its job, it will return SWITCH_AGENT.
+        # We loop because the NEXT agent may also immediately finish (e.g., Drafting generates PDFs in one shot).
+        while response.action_type == AgentActionType.SWITCH_AGENT:
+            logging.info(f"Agent Handoff Triggered. Old Agent finished.")
             
-        elif session.active_agent == AgentType.LEGAL:
-            agent_response = await self.legal_agent.process_turn(session, message, doc_url)
+            # Recalculate routing rules to find the NEXT agent
+            self._determine_next_agent(session)
+            logging.info(f"Orchestrator routed next step to: {session.active_agent.value}")
+            
+            # If everything is done, stop the chain
+            if session.active_agent == AgentType.COMPLETED:
+                break
+            
+            # Trigger the next agent's opening message
+            next_agent_response = await self._dispatch_to_agent(session, memory_manager, user_message=None, document_path=None)
+            
+            # Update cache with next agent's response
+            session.last_agent_response = {
+                "progress_status": next_agent_response.progress_status,
+                "is_loading": next_agent_response.is_loading,
+                "error_message": next_agent_response.error_message,
+                "download_urls": next_agent_response.download_urls,
+                "active_agent": session.active_agent.value,
+            }
+            
+            # Combine replies from the chain
+            final_reply = f"{final_reply}\n\n{next_agent_response.reply_message}"
+            
+            # Continue the loop — if this agent ALSO returned SWITCH_AGENT, handle it
+            response = next_agent_response
+
+        return final_reply
+
+
+    # --------------------------------------------------------------------------------
+    # ROUTING & DISPATCH LOGIC
+    # --------------------------------------------------------------------------------
+
+    def _determine_next_agent(self, session: SessionState):
+        """
+        The strict mathematical rules engine for your workflow:
+        Order: Triage -> Shelter (If Needed) -> Legal (If Needed) -> Completed
+        """
+        triage = session.triage
+        shelter = session.shelter
+        legal = session.legal
+
+        # RULE 1: Triage is always first.
+        if triage is None or triage.workflow_status != TriageWorkflowStatus.COMPLETED:
+            session.active_agent = AgentType.TRIAGE
+            return
+
+        # RULE 2: Shelter is second (Only if Triage explicitly flagged it as needed).
+        if triage.needs_immediate_shelter:
+            if shelter is None or shelter.workflow_status != ShelterWorkflowStatus.COMPLETED:
+                session.active_agent = AgentType.SHELTER
+                return
+
+        # RULE 3: Legal is third (Only if Triage explicitly flagged it AND Shelter is done/skipped).
+        if triage.needs_legal_action:
+            if legal is None or legal.workflow_status != LegalWorkflowStatus.READY_TO_DRAFT:
+                session.active_agent = AgentType.LEGAL
+                return
+
+        # RULE 4: Drafting is fourth (if Legal finished with drafts OR Shelter finished with consent)
+        drafting = session.drafting
+        has_legal_drafts = (legal and legal.workflow_status == LegalWorkflowStatus.READY_TO_DRAFT 
+                           and legal.drafts_to_generate)
+        has_shelter_consent = (shelter and shelter.workflow_status == ShelterWorkflowStatus.COMPLETED 
+                              and shelter.user_consent_to_share)
+        
+        if has_legal_drafts or has_shelter_consent:
+            if drafting is None or drafting.workflow_status != DraftingWorkflowStatus.COMPLETED:
+                session.active_agent = AgentType.DRAFTING
+                return
+
+        # RULE 5: Everything is done.
+        session.active_agent = AgentType.COMPLETED
+
+
+    async def _dispatch_to_agent(self, session: SessionState, memory_manager, user_message: str, document_path: str):
+        """Routes the execution to the correct Python Class."""
+        
+        if session.active_agent == AgentType.TRIAGE:
+            return await self.triage_agent.process_turn(session, memory_manager, user_message)
             
         elif session.active_agent == AgentType.SHELTER:
-            agent_response = await self.shelter_agent.process_turn(session, message)
-
-        # 4. HANDLE AGENT'S OUTPUT INSTRUCTIONS
-        await self._execute_agent_response(session, agent_response, user_id)
-
-        # 5. Save Global State back to Redis
-        await save_session_to_redis(session)
-
-
-    async def _execute_agent_response(self, session: SessionState, response, user_id: str):
-        """Executes whatever the Agent told the Orchestrator to do."""
+            return await self.shelter_agent.process_turn(session, memory_manager, user_message)
+            
+        elif session.active_agent == AgentType.LEGAL:
+            return await self.legal_agent.process_turn(session, memory_manager, user_message, document_path)
         
-        if response.action_type == AgentActionType.REPLY_TO_USER:
-            await send_whatsapp(user_id, response.reply_message)
+        elif session.active_agent == AgentType.DRAFTING:
+            return await self.drafting_agent.process_turn(session, memory_manager, user_message)
             
-        elif response.action_type == AgentActionType.SWITCH_AGENT:
-            # e.g., Legal Agent finished. Orchestrator takes over to see what's next.
-            session.active_agent = response.next_active_agent
-            
-            # If Orchestrator takes back control, immediately evaluate next steps
-            if session.active_agent == AgentType.ORCHESTRATOR:
-                await self._evaluate_next_orchestrator_step(session, user_id)
-
-    async def _evaluate_next_orchestrator_step(self, session: SessionState, user_id: str):
-        """The Master Logic: Decides what the user needs after Triage or after an agent finishes."""
-        
-        # Scenario 1: Triage just finished. We need Legal.
-        if session.triage and session.triage.needs_legal_action and not session.legal:
-            session.active_agent = AgentType.LEGAL
-            # Initialize empty legal state
-            session.legal = LegalAgentState(workflow_status="awaiting_docs", drafts_to_generate=[])
-            await send_whatsapp(user_id, "Let's prepare your legal defense. Please upload your rent agreement or eviction notice.")
-
-        # Scenario 2: Legal finished. Do they need a shelter?
-        elif session.triage and session.triage.needs_immediate_shelter and not session.shelter:
-            session.active_agent = AgentType.SHELTER
-            session.shelter = ShelterAgentState(workflow_status="awaiting_consent")
-            await send_whatsapp(user_id, "Your legal documents are ready. However, you indicated you are locked out. Do I have your consent to locate a nearby emergency shelter and send an application to the manager?")
-            
-        # Scenario 3: Everything is done.
-        else:
-            session.active_agent = AgentType.COMPLETED
-            await send_whatsapp(user_id, "All operations completed. Stay safe, and type 'Hi' if you need more help.")
-
-    def _is_emergency_override(self, message: str) -> bool:
-        """Fast regex/keyword check to interrupt agents."""
-        emergency_keywords =["help", "banging", "door", "hitting", "police", "scared", "street", "homeless"]
-        return any(word in message.lower() for word in emergency_keywords)
+        elif session.active_agent == AgentType.COMPLETED:
+            # Fallback if the user keeps typing after everything is done
+            from models.session import AgentResponse # Lazy import to avoid circular issues
+            return AgentResponse(
+                action_type=AgentActionType.REPLY_TO_USER,
+                reply_message="All our current tasks are completed. If your situation has escalated, please type 'Help' to restart the emergency protocols."
+            )

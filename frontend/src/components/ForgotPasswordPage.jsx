@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
-import { resetPassword, confirmResetPassword } from 'aws-amplify/auth';
+import { resetPassword } from 'aws-amplify/auth';
 import { useLanguage } from '../hooks/useLanguage.jsx';
 import { getTranslation } from '../utils/translations.js';
 import './AuthPages.css';
@@ -12,7 +12,6 @@ export default function ForgotPasswordPage() {
   const [loading, setLoading] = useState(false);
   const { language, setLanguage } = useLanguage();
   const navigate = useNavigate();
-
   const t = (key) => getTranslation(key, language);
 
   const handleResetPassword = async (e) => {
@@ -55,59 +54,60 @@ export default function ForgotPasswordPage() {
       </div>
 
       <div className="auth-box">
-        {/* Back Button */}
         <Link to="/login" className="back-button">
-          ← Back to Login
+          {t('auth.back_to_home')}
         </Link>
 
-        {/* Logo */}
         <div className="auth-logo">
           <span className="logo-icon">🔐</span>
           <h1>Sahayak</h1>
           <p>Last Mile Justice Navigator</p>
         </div>
 
-        {/* Reset Password Form */}
-        <form onSubmit={handleResetPassword} className="auth-form">
+        <div className="auth-form">
           <h2>{t('auth.reset_password')}</h2>
           <p className="auth-subtitle">{t('auth.reset_desc')}</p>
 
           {error && <div className="error-message">{error}</div>}
           {success && <div className="success-message">{success}</div>}
 
-          <div className="form-group">
-            <label htmlFor="email">{t('auth.email')}</label>
-            <input
-              id="email"
-              type="email"
-              value={email}
-              onChange={(e) => setEmail(e.target.value)}
-              placeholder="your@email.com"
-              required
-              disabled={loading}
-            />
+          <form onSubmit={handleResetPassword}>
+            <div className="form-group">
+              <label htmlFor="email">{t('auth.email')}</label>
+              <input
+                id="email"
+                type="email"
+                value={email}
+                onChange={(e) => setEmail(e.target.value)}
+                placeholder="your.email@example.com"
+                required
+                disabled={loading}
+                autoComplete="email"
+              />
+            </div>
+
+            <button
+              type="submit"
+              className="btn btn-primary btn-block"
+              disabled={loading || !email}
+            >
+              {loading ? t('auth.sending_email') : t('auth.send_reset_email_btn')}
+            </button>
+          </form>
+
+          <div className="auth-help" style={{ marginTop: '1.5rem' }}>
+            <p>
+              <strong>Note:</strong> If you don't have an account, you can use anonymous mode.
+            </p>
           </div>
+        </div>
 
-          <button type="submit" className="btn btn-primary btn-block" disabled={loading}>
-            {loading ? t('auth.sending_email') : t('auth.send_reset_email_btn')}
-          </button>
-        </form>
-
-        {/* Back to Login Link */}
         <p className="auth-switch">
-          Remember your password?{' '}
-          <Link to="/login" className="auth-link">
-            Sign in here
+          {t('auth.dont_have_account')}{' '}
+          <Link to="/signup" className="auth-link">
+            {t('auth.sign_up_here')}
           </Link>
         </p>
-
-        {/* Help Text */}
-        <div className="auth-help">
-          <p>
-            Check your email (including spam folder) for the password reset link.
-            Click the link to create a new password.
-          </p>
-        </div>
       </div>
     </div>
   );

@@ -1,0 +1,73 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <style>{% include "court_base.css" %}</style>
+</head>
+<body>
+    <div class="court-header">
+        <div class="court-name">In the Court of the Civil Judge (Senior Division)</div>
+        <div>{{ court_jurisdiction | default("Bengaluru Urban District") }}, Karnataka</div>
+    </div>
+
+    <h1>Application for Temporary Injunction</h1>
+    <p style="text-align: center;"><em>Under Order XXXIX Rules 1 & 2 of the Code of Civil Procedure, 1908</em></p>
+
+    <div class="party-block">
+        <strong>{{ applicant_name }}</strong><br>
+        Residing at: {{ property_address }}<br>
+        <em>...Plaintiff/Applicant</em>
+        <div class="versus">— VERSUS —</div>
+        <strong>{{ opponent_name }}</strong><br>
+        <em>...Defendant/Respondent</em>
+    </div>
+
+    <h2>Application for Interim Injunction</h2>
+
+    <div class="body-text">
+        The Applicant most respectfully submits as follows:
+    </div>
+
+    <div class="numbered-para">
+        1. That the Applicant is a lawful tenant/occupant of the premises situated at <strong>{{ property_address }}</strong> and has been in peaceful and continuous possession of the said premises.
+    </div>
+
+    <div class="numbered-para">
+        2. That the Respondent, <strong>{{ opponent_name }}</strong>, has without due process of law and in violation of the Karnataka Rent Control Act, 1999, attempted to forcibly dispossess the Applicant from the said premises.
+    </div>
+
+    <div class="numbered-para">
+        3. {{ draft_body_summary }}
+    </div>
+
+    <div class="numbered-para">
+        4. That the Applicant apprehends that unless this Hon'ble Court grants an order of injunction restraining the Respondent, the Respondent will continue to illegally interfere with the Applicant's peaceful possession, causing irreparable loss and injury.
+    </div>
+
+    <div class="numbered-para">
+        5. That the balance of convenience lies in favour of the Applicant and against the Respondent, and the Applicant will suffer irreparable injury if the injunction is not granted.
+    </div>
+
+    <div class="prayer-section">
+        <h2>Prayer</h2>
+        <p>It is therefore most respectfully prayed that this Hon'ble Court may be pleased to:</p>
+        <div class="numbered-para">
+            (a) Grant a temporary injunction restraining the Respondent, his agents, servants, or any person acting on his behalf from dispossessing the Applicant or interfering with the Applicant's peaceful occupation of the premises at <strong>{{ property_address }}</strong>;
+        </div>
+        <div class="numbered-para">
+            (b) Grant such other and further relief as this Hon'ble Court deems fit and proper in the interest of justice.
+        </div>
+    </div>
+
+    <div class="date-place">
+        <strong>Place:</strong> {{ place | default("Bengaluru") }}<br>
+        <strong>Date:</strong> {{ date_of_draft }}
+    </div>
+
+    <div class="signature-block">
+        <div class="line"></div>
+        <strong>{{ applicant_name }}</strong><br>
+        Applicant (In Person / Through Advocate)<br>
+        Contact: {{ applicant_phone | default("") }}
+    </div>
+</body>
+</html>

@@ -1,6 +1,14 @@
 openai
 jinja2
 pydantic
+pydantic-settings
+supabase
 boto3
 instructor
 redis
+thefuzz
+cohere
+chromadb
+beautifulsoup4
+fastapi
+aiofiles

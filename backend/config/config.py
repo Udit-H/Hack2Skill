@@ -11,24 +11,44 @@ class DocumentIntelligenceSettings(BaseSettings):
     endpoint: Optional[str] = os.getenv("DOCUMENT_INTELLIGENCE_ENDPOINT", "")
 
 class LLMSettings(BaseSettings):
-    provider: str = os.getenv("LLM_PROVIDER", "bedrock")  # "bedrock" or "openai"
-    model_id: str = os.getenv("LLM_MODEL_ID", "us.meta.llama3-2-90b-instruct-v1:0")
+    # AWS Bedrock (Primary LLM)
     aws_region: str = os.getenv("AWS_REGION", "us-east-1")
     aws_access_key_id: Optional[str] = os.getenv("AWS_ACCESS_KEY_ID")
     aws_secret_access_key: Optional[str] = os.getenv("AWS_SECRET_ACCESS_KEY")
-    # Legacy OpenAI/Gemini support
-    api_key: Optional[str] = os.getenv("GEMINI_API_KEY", "")
-    base_url: Optional[str] = os.getenv("GEMINI_BASE_URL", "")
+    bedrock_model_id: str = os.getenv("BEDROCK_MODEL_ID", "us.meta.llama3-2-90b-instruct-v1:0")
+    # Groq (Fallback LLM)
+    groq_api_key: str = os.getenv("GROQ_API_KEY", "")
+    groq_model_id: str = os.getenv("GROQ_MODEL_ID", "llama-3.3-70b-versatile")
 
 class RedisDbSettings(BaseSettings):
     host: Optional[str] = os.getenv("REDIS_HOST", "localhost")
     password: Optional[str] = os.getenv("REDIS_PASSWORD", "")
     db_name: Optional[str] = os.getenv("REDIS_DB_NAME", "0")
+    port: Optional[int] = os.getenv("REDIS_PORT", 14324)
+
+class SupabaseDbSettings(BaseSettings):
+    url: Optional[str] = os.getenv("SUPABASE_URL", "")
+    pub_key: Optional[str] = os.getenv("SUPABASE_PUB_KEY", "")
+    service_key: Optional[str] = os.getenv("SUPABASE_ANON_KEY", "")
+
+class CohereSettings(BaseSettings):
+    api_key: Optional[str] = os.getenv("COHERE_API_KEY", "")
+    base_url: str = "https://api.cohere.ai/v2"
+    client_name: str = "Development_Phase"
+    timeout: float = 4.0
+
+class ChromaDbSettings(BaseSettings):
+    tenant: Optional[str] = os.getenv("CHROMA_TENANT", "")
+    database: Optional[str] = os.getenv("CHROMA_DATABASE", "")
+    token: Optional[str] = os.getenv("CHROMA_TOKEN", "")
 
 class Settings(BaseSettings):
     document_intelligence: DocumentIntelligenceSettings = DocumentIntelligenceSettings()
     llm: LLMSettings = LLMSettings()
     redisdb: RedisDbSettings = RedisDbSettings()
+    supabase: SupabaseDbSettings = SupabaseDbSettings()
+    cohere: CohereSettings = CohereSettings()
+    chromadb: ChromaDbSettings = ChromaDbSettings()
 
 
 @lru_cache

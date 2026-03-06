@@ -6,11 +6,16 @@ export async function createSession() {
     return res.json();
 }
 
-export async function sendMessage(sessionId, message, language = 'en') {
+export async function sendMessage(sessionId, message, language = 'en', coords = null) {
+    const body = { session_id: sessionId, message, language };
+    if (coords) {
+        body.latitude = coords.latitude;
+        body.longitude = coords.longitude;
+    }
     const res = await fetch(`${API_BASE}/chat`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ session_id: sessionId, message, language }),
+        body: JSON.stringify(body),
     });
     if (!res.ok) throw new Error('Failed to send message');
     return res.json();

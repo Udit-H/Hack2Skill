@@ -1,7 +1,6 @@
 import { useState, useEffect, useContext, createContext } from 'react';
-import { signOut } from 'aws-amplify/auth';
+import { signOut, getCurrentUser } from 'aws-amplify/auth';
 import { Hub } from 'aws-amplify/utils';
-import { getCurrentUser } from 'aws-amplify/auth';
 
 const AuthContext = createContext();
 
@@ -16,8 +15,8 @@ export function AuthProvider({ children }) {
         const currentUser = await getCurrentUser();
         setUser(currentUser);
       } catch (err) {
-        // Not authenticated
-        setUser(null);
+        // Not authenticated - set anonymous user for now
+        setUser({ anonymous: true });
       } finally {
         setLoading(false);
       }
@@ -29,10 +28,10 @@ export function AuthProvider({ children }) {
     const hubListener = Hub.listen('auth', ({ payload }) => {
       switch (payload.event) {
         case 'signedIn':
-          getCurrentUser().then(user => setUser(user)).catch(() => setUser(null));
+          getCurrentUser().then(user => setUser(user)).catch(() => setUser({ anonymous: true }));
           break;
         case 'signedOut':
-          setUser(null);
+          setUser({ anonymous: true });
           break;
         case 'tokenRefresh':
           // Token refreshed, user object remains valid
@@ -45,17 +44,24 @@ export function AuthProvider({ children }) {
     return () => hubListener();
   }, []);
 
+  const loginAnonymous = () => {
+    // For anonymous access, just set a mock user
+    setUser({ anonymous: true, id: 'anonymous-' + Date.now() });
+  };
+
   const logout = async () => {
     try {
       await signOut();
-      setUser(null);
+      setUser({ anonymous: true });
     } catch (err) {
       console.error('Logout error:', err);
+      // Even if signOut fails, treat as anonymous
+      setUser({ anonymous: true });
     }
   };
 
   return (
-    <AuthContext.Provider value={{ user, loading, logout }}>
+    <AuthContext.Provider value={{ user, loading, logout, loginAnonymous }}>
       {children}
     </AuthContext.Provider>
   );

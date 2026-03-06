@@ -66,8 +66,8 @@ export default function ChatApp() {
           </div>
 
           <div className="chat-header-actions">
-            <select 
-              className="lang-selector" 
+            <select
+              className="lang-selector"
               value={language}
               onChange={(e) => setLanguage(e.target.value)}
               aria-label="Language"
@@ -104,7 +104,7 @@ export default function ChatApp() {
         <InputBar
           onSend={send}
           onUpload={upload}
-          isLoading={isLoading}
+          isLoading={isLoading || !sessionId}
         />
       </main>
     </div>

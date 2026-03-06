@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
-import { signUp, confirmSignUp, autoSignIn } from 'aws-amplify/auth';
+import { signUp, autoSignIn } from 'aws-amplify/auth';
+import { useAuth } from '../hooks/useAuth.jsx';
 import { useLanguage } from '../hooks/useLanguage.jsx';
 import { getTranslation } from '../utils/translations.js';
 import './AuthPages.css';
@@ -12,8 +13,8 @@ export default function SignupPage() {
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
   const { language, setLanguage } = useLanguage();
+  const { loginAnonymous } = useAuth();
   const navigate = useNavigate();
-
   const t = (key) => getTranslation(key, language);
 
   const validateForm = () => {
@@ -77,6 +78,18 @@ export default function SignupPage() {
     }
   };
 
+  const handleAnonymousSignup = async () => {
+    setError('');
+    setLoading(true);
+    try {
+      loginAnonymous();
+      navigate('/chat');
+    } catch (err) {
+      setError(err.message || 'Failed to continue');
+      setLoading(false);
+    }
+  };
+
   return (
     <div className="auth-container">
       <div className="language-selector">
@@ -89,79 +102,92 @@ export default function SignupPage() {
       </div>
 
       <div className="auth-box">
-        {/* Back Button */}
         <Link to="/" className="back-button">
           {t('auth.back_to_home')}
         </Link>
 
-        {/* Logo */}
         <div className="auth-logo">
           <span className="logo-icon">🏛️</span>
           <h1>Sahayak</h1>
           <p>Last Mile Justice Navigator</p>
         </div>
 
-        {/* Signup Form */}
-        <form onSubmit={handleSignup} className="auth-form">
+        <div className="auth-form">
           <h2>{t('auth.create_account')}</h2>
           <p className="auth-subtitle">{t('auth.signup_desc')}</p>
 
           {error && <div className="error-message">{error}</div>}
 
-          <div className="form-group">
-            <label htmlFor="email">{t('auth.email')}</label>
-            <input
-              id="email"
-              type="email"
-              value={email}
-              onChange={(e) => setEmail(e.target.value)}
-              placeholder="your@email.com"
-              required
-              disabled={loading}
-            />
+          <form onSubmit={handleSignup}>
+            <div className="form-group">
+              <label htmlFor="email">{t('auth.email')}</label>
+              <input
+                id="email"
+                type="email"
+                value={email}
+                onChange={(e) => setEmail(e.target.value)}
+                placeholder="your@email.com"
+                required
+                disabled={loading}
+                autoComplete="email"
+              />
+            </div>
+
+            <div className="form-group">
+              <label htmlFor="password">{t('auth.password')}</label>
+              <input
+                id="password"
+                type="password"
+                value={password}
+                onChange={(e) => setPassword(e.target.value)}
+                placeholder="••••••••"
+                required
+                disabled={loading}
+                autoComplete="new-password"
+              />
+              <small>At least 12 characters: uppercase, lowercase, number, special character (!@#$%^&*)</small>
+            </div>
+
+            <div className="form-group">
+              <label htmlFor="confirmPassword">{t('auth.confirm_password')}</label>
+              <input
+                id="confirmPassword"
+                type="password"
+                value={confirmPassword}
+                onChange={(e) => setConfirmPassword(e.target.value)}
+                placeholder="••••••••"
+                required
+                disabled={loading}
+                autoComplete="new-password"
+              />
+            </div>
+
+            <div className="terms-checkbox">
+              <input type="checkbox" id="terms" required disabled={loading} />
+              <label htmlFor="terms">
+                {t('auth.by_continuing')} <a href="/terms" target="_blank" rel="noopener noreferrer">{t('auth.terms_of_service')}</a> {t('auth.and')}{' '}
+                <a href="/privacy" target="_blank" rel="noopener noreferrer">{t('auth.privacy_policy')}</a>
+              </label>
+            </div>
+
+            <button type="submit" className="btn btn-primary btn-block" disabled={loading || !email || !password || !confirmPassword}>
+              {loading ? 'Creating Account...' : t('auth.create_account_btn')}
+            </button>
+          </form>
+
+          <div className="divider">
+            <span>OR</span>
           </div>
 
-          <div className="form-group">
-            <label htmlFor="password">{t('auth.password')}</label>
-            <input
-              id="password"
-              type="password"
-              value={password}
-              onChange={(e) => setPassword(e.target.value)}
-              placeholder="••••••••"
-              required
-              disabled={loading}
-            />
-            <small>At least 12 characters: uppercase, lowercase, number, special character (!@#$%^&*)</small>
-          </div>
-
-          <div className="form-group">
-            <label htmlFor="confirmPassword">{t('auth.confirm_password')}</label>
-            <input
-              id="confirmPassword"
-              type="password"
-              value={confirmPassword}
-              onChange={(e) => setConfirmPassword(e.target.value)}
-              placeholder="••••••••"
-              required
-              disabled={loading}
-            />
-          </div>
-
-          <div className="terms-checkbox">
-            <input type="checkbox" id="terms" required disabled={loading} />
-            <label htmlFor="terms">
-              {t('auth.by_continuing')} <a href="/terms" target="_blank" rel="noopener noreferrer">{t('auth.terms_of_service')}</a> {t('auth.and')}{' '}
-              <a href="/privacy" target="_blank" rel="noopener noreferrer">{t('auth.privacy_policy')}</a>
-            </label>
-          </div>
-
-          <button type="submit" className="btn btn-primary btn-block" disabled={loading}>
-            {loading ? t('auth.sending_email') : t('auth.create_account_btn')}
+          <button
+            onClick={handleAnonymousSignup}
+            className="btn btn-secondary btn-block"
+            disabled={loading}
+          >
+            {t('auth.continue_without_login')}
           </button>
-        </form>
+        </div>
 
-        {/* Login Link */}
         <p className="auth-switch">
           {t('auth.already_have_account')}{' '}
           <Link to="/login" className="auth-link">
@@ -169,15 +195,17 @@ export default function SignupPage() {
           </Link>
         </p>
 
-        {/* Help Text */}
         <div className="auth-help">
           <p>
-            Your information is secure and will never be shared without your consent.
+            {t('auth.emergency_help')}
           </p>
+        </div>
+
+        <div className="auth-terms">
+          <p>Your information is secure and will never be shared without your consent.</p>
         </div>
       </div>
 
-      {/* Sidebar Info */}
       <div className="auth-sidebar">
         <div className="sidebar-content">
           <h3>Why Join Sahayak?</h3>
@@ -186,7 +214,7 @@ export default function SignupPage() {
               <span className="help-icon">⚡</span>
               <div>
                 <strong>Instant Access</strong>
-                <p>Get help immediately upon signup</p>
+                <p>Get help immediately</p>
               </div>
             </li>
             <li>

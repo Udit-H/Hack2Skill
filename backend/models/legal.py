@@ -8,10 +8,23 @@ from typing import Optional, List
 from enum import Enum
 
 class DraftType(str, Enum):
-    DELHI_SHO_INTIMATION = "delhi_sho_intimation"           # Case 1
-    DIR_FORM_1 = "dir_form_1"                               # Case 2
-    DELHI_DM_EVICTION_PETITION = "delhi_dm_eviction_petition" # Case 3
-    DSLSA_LEGAL_AID_FORM = "dslsa_legal_aid_form"           # Case 5
+    # Eviction
+    POLICE_INTIMATION = "police_intimation"                     # Police complaint (BNS 126)
+    CIVIL_INJUNCTION_PETITION = "civil_injunction_petition"     # Civil court injunction
+    INTERIM_RELIEF_APPLICATION = "interim_relief_application"   # Interim relief
+    # Domestic Violence
+    DIR_FORM_1 = "dir_form_1"                                   # Domestic Incident Report
+    SECTION_12_PETITION = "section_12_petition"                 # DV Act Section 12
+    # Shelter
+    SHELTER_REFERRAL = "shelter_referral"                       # Referral to shelter org
+    BBMP_SHELTER_REQUEST = "bbmp_shelter_request"               # BBMP shelter request
+    NGO_REFERRAL = "ngo_referral"                               # NGO referral letter
+    # Senior Citizen
+    SENIOR_CITIZEN_TRIBUNAL = "senior_citizen_tribunal"         # 2007 Act tribunal complaint
+    # Safety
+    SAFETY_PLAN = "safety_plan"                                 # DV safety plan document
+    # Legal Aid
+    KSLSA_LEGAL_AID = "kslsa_legal_aid"                         # Karnataka State Legal Services
 
 class WorkflowStatus(str, Enum):
     AWAITING_DOCS = "awaiting_docs"
@@ -22,8 +35,8 @@ class WorkflowStatus(str, Enum):
 class LegalDraftPayload(BaseModel):
     draft_type: DraftType
     applicant_name: str
-    opponent_name: Optional[str]
-    property_address: Optional[str]
+    opponent_name: Optional[str] = None
+    property_address: Optional[str] = None
     
     # Delhi DSLSA Specifics
     monthly_income: Optional[int] = Field(None, description="Required for DSLSA form")
@@ -32,12 +45,31 @@ class LegalDraftPayload(BaseModel):
     # Senior Citizen Specifics
     is_property_in_applicant_name: Optional[bool] = None
     
+    # Domestic Violence Specifics
+    relationship_to_respondent: Optional[str] = Field(None, description="e.g., Husband, Live-in Partner, Father-in-law")
+    violence_types: Optional[list[str]] = Field(None, description="e.g., ['physical', 'emotional', 'economic', 'sexual']")
+    children_involved: Optional[bool] = Field(None, description="Are minor children affected?")
+    number_of_children: Optional[int] = Field(None)
+    marriage_date: Optional[str] = Field(None, description="Date of marriage if applicable")
+    immediate_danger: Optional[bool] = Field(None, description="Is the user currently in danger?")
+    
+    # Safety Plan Specifics
+    trusted_contact_name: Optional[str] = Field(None)
+    trusted_contact_phone: Optional[str] = Field(None)
+    safe_location: Optional[str] = Field(None, description="A place the user can go in emergency")
+    
     draft_body_summary: str = Field(description="JSON or Text mapping for the specific legal form.")
 
 class LegalAgentState(BaseModel):
-    workflow_status: WorkflowStatus
+    internal_plan: list[str] = Field(
+        default_factory=list,
+        description="MANDATORY FIRST STEP: Before any decision, list your reasoning. "
+                    "1) What facts do I already know? 2) What is missing? 3) What should I do next and why?"
+    )
+    
+    workflow_status: WorkflowStatus = WorkflowStatus.AWAITING_DOCS
     extracted_doc_data: Optional[str] = Field(None, description="Raw OCR text.")
-    retrieved_legal_context: Optional[str] = Field(None, description="Delhi laws from RAGFlow.")
+    retrieved_legal_context: Optional[str] = Field(None, description="Laws from RAG knowledge base.")
     
     next_question_for_user: Optional[str] = Field(None)
     user_consent_police: Optional[bool] = Field(None)

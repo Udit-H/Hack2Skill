@@ -3,12 +3,15 @@ from typing import Optional, List
 from enum import Enum
 from models.triage import TriageState
 from models.legal import LegalAgentState
-# from models.shelter import ShelterAgentState 
+from models.shelter import ShelterAgentState
+from models.drafting import DraftingAgentState
 
 class AgentType(str, Enum):
     ORCHESTRATOR = "orchestrator" # Doing initial triage
+    TRIAGE = "triage"
     LEGAL = "legal"
     SHELTER = "shelter"
+    DRAFTING = "drafting"
     COMPLETED = "completed"
 
 class AgentActionType(str, Enum):
@@ -22,6 +25,11 @@ class AgentResponse(BaseModel):
     reply_message: Optional[str] = None
     next_active_agent: Optional[AgentType] = None
     background_task_name: Optional[str] = None
+    # UI/UX fields for progress tracking and downloads
+    progress_status: Optional[str] = None  # e.g., "searching shelters...", "found 3 matches", "drafting doc 1/3"
+    is_loading: bool = False  # True when agent is actively processing (for animations)
+    error_message: Optional[str] = None  # User-friendly error message if operation fails
+    download_urls: Optional[List[str]] = None  # List of generated PDF download URLs
 
 class SessionState(BaseModel):
     """The Global Database Object stored in Redis"""
@@ -32,6 +40,10 @@ class SessionState(BaseModel):
     # Sub-States
     triage: Optional[TriageState] = None
     legal: Optional[LegalAgentState] = None
-    # shelter: Optional[ShelterAgentState] = None
+    shelter: Optional[ShelterAgentState] = None
+    drafting: Optional[DraftingAgentState] = None
     
     chat_history: List[dict] = Field(default_factory=list, description="Recent message history for context.")
+    
+    # Cache of last agent response for UI (progress, errors, downloads)
+    last_agent_response: Optional[dict] = Field(default=None, description="Latest agent response fields for UI display")

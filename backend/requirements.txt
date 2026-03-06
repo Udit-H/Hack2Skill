@@ -9,7 +9,7 @@ pydantic==2.12.5
 pydantic-settings==2.13.1
 python-dotenv==1.2.1
 
-# LLM
+# LLM (Bedrock primary, Groq fallback — both via openai client)
 openai==2.24.0
 instructor==1.14.5
 google-genai==0.4.0  # Legacy Gemini support
@@ -26,3 +26,16 @@ boto3==1.42.59
 # Async HTTP & File I/O
 aiohttp==3.13.3
 aiofiles==25.1.0
+
+# PDF Generation
+weasyprint>=62.0
+pypdf>=5.0
+
+# Supabase (Shelter DB)
+supabase>=2.0
+thefuzz>=0.22
+
+# RAG Pipeline
+cohere>=5.0
+chromadb>=1.0
+beautifulsoup4>=4.0

@@ -1,0 +1,75 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <style>{% include "court_base.css" %}</style>
+</head>
+<body>
+    <div class="header-block">
+        <strong>Date:</strong> {{ date_of_draft }}<br><br>
+        <strong>To,</strong><br>
+        The Member Secretary,<br>
+        Karnataka State Legal Services Authority (KSLSA),<br>
+        No. 1, Nrupathunga Road,<br>
+        Bengaluru – 560001, Karnataka.
+    </div>
+
+    <div class="subject-line">
+        SUBJECT: Application for Free Legal Aid Under Section 12 of the Legal Services Authorities Act, 1987
+    </div>
+
+    <div class="body-text">
+        Respected Sir/Madam,
+    </div>
+
+    <div class="body-text">
+        I, <strong>{{ applicant_name }}</strong>, resident of <strong>{{ property_address | default("as stated below") }}</strong>, hereby submit this application seeking free legal aid from the Karnataka State Legal Services Authority under the Legal Services Authorities Act, 1987.
+    </div>
+
+    <h2>Applicant Details</h2>
+    <table>
+        <tr><th>Full Name</th><td>{{ applicant_name }}</td></tr>
+        <tr><th>Father's/Husband's Name</th><td>{{ guardian_name | default("") }}</td></tr>
+        <tr><th>Address</th><td>{{ property_address | default("") }}</td></tr>
+        <tr><th>Occupation</th><td>{{ occupation | default("") }}</td></tr>
+        <tr><th>Monthly Income</th><td>₹{{ monthly_income | default("") }}</td></tr>
+        <tr><th>Category</th><td>{{ caste_category | default("") }}</td></tr>
+        <tr><th>Contact Number</th><td>{{ applicant_phone | default("") }}</td></tr>
+    </table>
+
+    <h2>Eligibility Ground</h2>
+    <div class="body-text">
+        {% if caste_category and caste_category in ['SC', 'ST'] %}
+        The applicant belongs to the Scheduled Caste/Scheduled Tribe category and is eligible under Section 12(a) of the Act.
+        {% elif monthly_income and monthly_income|int < 300000 %}
+        The applicant's annual income is below the prescribed limit and is eligible under Section 12(h) of the Act.
+        {% else %}
+        The applicant is a victim of {{ crisis_category | default("illegal eviction / domestic violence") }} and is eligible for legal aid under the applicable provisions of the Act.
+        {% endif %}
+    </div>
+
+    <h2>Nature of Case</h2>
+    <div class="body-text">
+        {{ draft_body_summary }}
+    </div>
+
+    <h2>Relief Sought</h2>
+    <div class="body-text">
+        The applicant seeks legal representation and assistance for filing appropriate legal proceedings and obtaining relief from the Hon'ble Court.
+    </div>
+
+    <div class="body-text">
+        I hereby declare that the information furnished above is true to the best of my knowledge and belief.
+    </div>
+
+    <div class="date-place">
+        <strong>Place:</strong> {{ place | default("Bengaluru") }}<br>
+        <strong>Date:</strong> {{ date_of_draft }}
+    </div>
+
+    <div class="signature-block">
+        <div class="line"></div>
+        <strong>{{ applicant_name }}</strong><br>
+        Applicant
+    </div>
+</body>
+</html>

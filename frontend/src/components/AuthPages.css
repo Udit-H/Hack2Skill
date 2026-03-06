@@ -247,6 +247,40 @@
   z-index: 1;
 }
 
+/* Alternative divider style */
+.divider {
+  position: relative;
+  margin: 1.5rem 0;
+  width: 100%;
+  text-align: center;
+}
+
+.divider::before {
+  content: '';
+  position: absolute;
+  top: 50%;
+  left: 0;
+  right: 0;
+  height: 1px;
+  background: var(--neutral-700);
+}
+
+.divider span {
+  position: relative;
+  background: var(--bg-secondary);
+  padding: 0 1rem;
+  color: var(--text-secondary);
+  font-size: 0.85rem;
+  font-weight: 500;
+  z-index: 1;
+}
+
+.form-footer {
+  display: flex;
+  justify-content: flex-end;
+  margin-bottom: 1.5rem;
+}
+
 .auth-switch {
   text-align: center;
   color: var(--text-secondary);

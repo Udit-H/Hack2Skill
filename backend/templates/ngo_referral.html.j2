@@ -1,0 +1,61 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <style>{% include "court_base.css" %}</style>
+</head>
+<body>
+    <div class="header-block">
+        <strong>Date:</strong> {{ date_of_draft }}<br><br>
+        <strong>To,</strong><br>
+        The Director / Coordinator,<br>
+        {{ ngo_name | default("Concerned NGO") }}<br>
+        {{ ngo_address | default("Bengaluru, Karnataka") }}
+    </div>
+
+    <div class="subject-line">
+        SUBJECT: Referral for Emergency Assistance and Support Services
+    </div>
+
+    <div class="body-text">
+        Dear Sir/Madam,
+    </div>
+
+    <div class="body-text">
+        This letter is to formally refer <strong>{{ applicant_name }}</strong> to your organization for emergency assistance. The individual is currently experiencing a crisis and requires immediate support services.
+    </div>
+
+    <h2>Referred Person Details</h2>
+    <table>
+        <tr><th>Name</th><td>{{ applicant_name }}</td></tr>
+        <tr><th>Age</th><td>{{ applicant_age | default("") }}</td></tr>
+        <tr><th>Contact</th><td>{{ applicant_phone | default("") }}</td></tr>
+        <tr><th>Crisis Category</th><td>{{ crisis_category | default("") }}</td></tr>
+    </table>
+
+    <h2>Situation Summary</h2>
+    <div class="body-text">
+        {{ draft_body_summary }}
+    </div>
+
+    <h2>Services Requested</h2>
+    <div class="body-text">
+        <ul>
+            <li>Emergency shelter / safe accommodation</li>
+            <li>Counselling and emotional support</li>
+            <li>Legal assistance coordination</li>
+            <li>Livelihood support and rehabilitation</li>
+        </ul>
+    </div>
+
+    <div class="body-text">
+        We request your organization to extend all necessary support and assistance to the referred individual at the earliest.
+    </div>
+
+    <div class="signature-block">
+        <div class="line"></div>
+        <strong>Sahayak — Last Mile Justice Navigator</strong><br>
+        Automated Referral System<br>
+        Date: {{ date_of_draft }}
+    </div>
+</body>
+</html>

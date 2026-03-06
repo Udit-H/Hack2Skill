@@ -1,0 +1,66 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <style>{% include "court_base.css" %}</style>
+</head>
+<body>
+    <div class="header-block">
+        <strong>Date:</strong> {{ date_of_draft }}<br><br>
+        <strong>To,</strong><br>
+        The Commissioner,<br>
+        Bruhat Bengaluru Mahanagara Palike (BBMP),<br>
+        N.R. Square, Bengaluru – 560002,<br>
+        Karnataka.
+    </div>
+
+    <div class="subject-line">
+        SUBJECT: Request for Emergency Shelter Accommodation Under BBMP Urban Homeless Scheme
+    </div>
+
+    <div class="body-text">
+        Respected Sir/Madam,
+    </div>
+
+    <div class="body-text">
+        I, <strong>{{ applicant_name }}</strong>, hereby submit this request for emergency shelter accommodation under the Bruhat Bengaluru Mahanagara Palike's Urban Homeless Shelter Scheme.
+    </div>
+
+    <h2>Applicant Details</h2>
+    <table>
+        <tr><th>Full Name</th><td>{{ applicant_name }}</td></tr>
+        <tr><th>Age</th><td>{{ applicant_age | default("") }}</td></tr>
+        <tr><th>Previous Address</th><td>{{ property_address | default("") }}</td></tr>
+        <tr><th>Contact Number</th><td>{{ applicant_phone | default("") }}</td></tr>
+        <tr><th>Category</th><td>{{ caste_category | default("") }}</td></tr>
+        <tr><th>Family Members</th><td>{{ family_members | default("") }}</td></tr>
+    </table>
+
+    <h2>Reason for Request</h2>
+    <div class="body-text">
+        {{ draft_body_summary }}
+    </div>
+
+    <div class="body-text">
+        I am currently without any shelter and am in urgent need of safe accommodation. I do not have the financial means to arrange for alternative housing at this time.
+    </div>
+
+    <div class="body-text">
+        I kindly request you to allot emergency shelter at the nearest BBMP night shelter or any available urban shelter under your jurisdiction.
+    </div>
+
+    <div class="body-text">
+        I hereby declare that all the information furnished above is true and correct to the best of my knowledge.
+    </div>
+
+    <div class="date-place">
+        <strong>Place:</strong> Bengaluru<br>
+        <strong>Date:</strong> {{ date_of_draft }}
+    </div>
+
+    <div class="signature-block">
+        <div class="line"></div>
+        <strong>{{ applicant_name }}</strong><br>
+        Applicant
+    </div>
+</body>
+</html>

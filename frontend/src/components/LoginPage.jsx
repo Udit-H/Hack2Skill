@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
 import { signIn } from 'aws-amplify/auth';
+import { useAuth } from '../hooks/useAuth.jsx';
 import { useLanguage } from '../hooks/useLanguage.jsx';
 import { getTranslation } from '../utils/translations.js';
 import './AuthPages.css';
@@ -11,6 +12,7 @@ export default function LoginPage() {
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
   const { language, setLanguage } = useLanguage();
+  const { loginAnonymous } = useAuth();
   const navigate = useNavigate();
 
   const t = (key) => getTranslation(key, language);
@@ -45,12 +47,8 @@ export default function LoginPage() {
     setLoading(true);
 
     try {
-      // Note: Cognito does not support truly anonymous auth.
-      // This creates a temporary guest session.
-      // For a better experience, consider allowing guest access at the app level
-      // rather than at the auth level.
-      alert('Anonymous login is not available with Cognito. Please create an account.');
-      setLoading(false);
+      loginAnonymous();
+      navigate('/chat');
     } catch (err) {
       setError(err.message || 'Failed to login anonymously');
       setLoading(false);
@@ -69,62 +67,77 @@ export default function LoginPage() {
       </div>
 
       <div className="auth-box">
-        {/* Back Button */}
         <Link to="/" className="back-button">
           {t('auth.back_to_home')}
         </Link>
 
-        {/* Logo */}
         <div className="auth-logo">
           <span className="logo-icon">⚖️</span>
           <h1>Sahayak</h1>
           <p>Last Mile Justice Navigator</p>
         </div>
 
-        {/* Login Form */}
-        <form onSubmit={handleLogin} className="auth-form">
+        <div className="auth-form">
           <h2>{t('auth.welcome_back')}</h2>
-          <p className="auth-subtitle">{t('auth.sign_in_desc')}</p>
+          <p className="auth-subtitle">Sign in to access your secure session</p>
 
           {error && <div className="error-message">{error}</div>}
 
-          <div className="form-group">
-            <label htmlFor="email">{t('auth.email')}</label>
-            <input
-              id="email"
-              type="email"
-              value={email}
-              onChange={(e) => setEmail(e.target.value)}
-              placeholder="your@email.com"
-              required
-              disabled={loading}
-            />
+          <form onSubmit={handleLogin}>
+            <div className="form-group">
+              <label htmlFor="email">{t('auth.email')}</label>
+              <input
+                id="email"
+                type="email"
+                placeholder="your.email@example.com"
+                value={email}
+                onChange={(e) => setEmail(e.target.value)}
+                required
+                disabled={loading}
+                autoComplete="email"
+              />
+            </div>
+
+            <div className="form-group">
+              <label htmlFor="password">{t('auth.password')}</label>
+              <input
+                id="password"
+                type="password"
+                placeholder="••••••••"
+                value={password}
+                onChange={(e) => setPassword(e.target.value)}
+                required
+                disabled={loading}
+                autoComplete="current-password"
+              />
+            </div>
+
+            <div className="form-footer">
+              <Link to="/forgot-password" className="forgot-password-link">
+                {t('auth.forgot_password')}
+              </Link>
+            </div>
+
+            <button
+              type="submit"
+              className="btn btn-primary btn-block"
+              disabled={loading || !email || !password}
+            >
+              {loading ? 'Signing in...' : t('auth.login')}
+            </button>
+          </form>
+
+          <div className="divider">
+            <span>OR</span>
           </div>
 
-          <div className="form-group">
-            <label htmlFor="password">{t('auth.password')}</label>
-            <input
-              id="password"
-              type="password"
-              value={password}
-              onChange={(e) => setPassword(e.target.value)}
-              placeholder="••••••••"
-              required
-              disabled={loading}
-            />
-            <Link to="/forgot-password" className="forgot-password-link">
-              {t('auth.forgot_password')}
-            </Link>
-          </div>
-
-          <button type="submit" className="btn btn-primary btn-block" disabled={loading}>
-            {loading ? t('auth.sending_email') : t('auth.sign_in_btn')}
+          <button
+            onClick={handleAnonymousLogin}
+            className="btn btn-secondary btn-block"
+            disabled={loading}
+          >
+            {t('auth.continue_without_login')}
           </button>
-        </form>
-
-        {/* Divider */}
-        <div className="auth-divider">
-          <span>or</span>
         </div>
 
         {/* Sign Up Link */}
@@ -142,7 +155,6 @@ export default function LoginPage() {
           </p>
         </div>
 
-        {/* Terms & Privacy */}
         <div className="auth-terms">
           <p>
             {t('auth.by_continuing')}{' '}
@@ -153,7 +165,6 @@ export default function LoginPage() {
         </div>
       </div>
 
-      {/* Sidebar Info */}
       <div className="auth-sidebar">
         <div className="sidebar-content">
           <h3>Need Help Right Now?</h3>

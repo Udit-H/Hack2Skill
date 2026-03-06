@@ -1,0 +1,65 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <style>{% include "court_base.css" %}</style>
+</head>
+<body>
+    <div class="header-block">
+        <strong>Date:</strong> {{ date_of_draft }}<br><br>
+        <strong>To,</strong><br>
+        The Manager / Director,<br>
+        {{ shelter_name }}<br>
+        {{ shelter_address }}
+    </div>
+
+    <div class="subject-line">
+        SUBJECT: Referral for Emergency Shelter Accommodation
+    </div>
+
+    <div class="body-text">
+        Dear Sir/Madam,
+    </div>
+
+    <div class="body-text">
+        This letter is to refer <strong>{{ applicant_name }}</strong> for emergency shelter accommodation at your establishment. The individual is currently in a crisis situation and requires immediate safe housing.
+    </div>
+
+    <h2>Referred Person Details</h2>
+    <table>
+        <tr><th>Name</th><td>{{ applicant_name }}</td></tr>
+        <tr><th>Age</th><td>{{ applicant_age | default("") }}</td></tr>
+        <tr><th>Contact</th><td>{{ applicant_phone | default("") }}</td></tr>
+        <tr><th>Crisis Category</th><td>{{ crisis_category | default("") }}</td></tr>
+        <tr><th>Urgency Level</th><td>{{ urgency_level | default("High") }}</td></tr>
+    </table>
+
+    <h2>Background</h2>
+    <div class="body-text">
+        {{ draft_body_summary }}
+    </div>
+
+    <h2>Immediate Needs</h2>
+    <div class="body-text">
+        {% if needs_list %}
+        <ul>
+            {% for need in needs_list %}
+            <li>{{ need }}</li>
+            {% endfor %}
+        </ul>
+        {% else %}
+        Safe accommodation, food, and access to essential services.
+        {% endif %}
+    </div>
+
+    <div class="body-text">
+        Your immediate attention and assistance in providing shelter to the referred person would be greatly appreciated.
+    </div>
+
+    <div class="signature-block">
+        <div class="line"></div>
+        <strong>Sahayak — Last Mile Justice Navigator</strong><br>
+        Automated Referral System<br>
+        Date: {{ date_of_draft }}
+    </div>
+</body>
+</html>

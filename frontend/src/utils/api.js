@@ -1,16 +1,44 @@
 const API_BASE = '/api';
 
-export async function createSession() {
-    const res = await fetch(`${API_BASE}/session`, { method: 'POST' });
+export async function createSession(userId = null) {
+    const options = { method: 'POST' };
+    if (userId) {
+        options.headers = { 'Content-Type': 'application/json' };
+        options.body = JSON.stringify({ user_id: userId });
+    }
+    const res = await fetch(`${API_BASE}/session`, options);
     if (!res.ok) throw new Error('Failed to create session');
     return res.json();
 }
 
-export async function sendMessage(sessionId, message, language = 'en', coords = null) {
+export async function listUserSessions(userId) {
+    const res = await fetch(`${API_BASE}/sessions/list`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ user_id: userId }),
+    });
+    if (!res.ok) throw new Error('Failed to list sessions');
+    return res.json();
+}
+
+export async function loadSession(sessionId, userId) {
+    const res = await fetch(`${API_BASE}/sessions/load`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ session_id: sessionId, user_id: userId }),
+    });
+    if (!res.ok) throw new Error('Failed to load session');
+    return res.json();
+}
+
+export async function sendMessage(sessionId, message, language = 'en', coords = null, userId = null) {
     const body = { session_id: sessionId, message, language };
     if (coords) {
         body.latitude = coords.latitude;
         body.longitude = coords.longitude;
+    }
+    if (userId) {
+        body.user_id = userId;
     }
     const res = await fetch(`${API_BASE}/chat`, {
         method: 'POST',

@@ -1,6 +1,7 @@
 import { useState, useCallback, useRef, useEffect } from 'react';
-import { createSession, sendMessage, uploadDocument } from '../utils/api';
+import { createSession, sendMessage, uploadDocument, loadSession } from '../utils/api';
 import { useLanguage } from './useLanguage.jsx';
+import { useAuth } from './useAuth.jsx';
 
 export function useChat() {
     const [messages, setMessages] = useState([]);
@@ -8,12 +9,38 @@ export function useChat() {
     const [isLoading, setIsLoading] = useState(false);
     const [error, setError] = useState(null);
     const { language } = useLanguage();
+    const { user } = useAuth();
     const [agentInfo, setAgentInfo] = useState({
         activeAgent: 'legal',
         workflowStatus: 'awaiting_docs',
     });
     const initialized = useRef(false);
     const userCoords = useRef(null);
+
+    // Get user ID from authenticated user
+    // Cognito user object has userId or username field
+    // For anonymous users, generate a browser-specific ID
+    const getUserId = () => {
+        if (user?.userId || user?.username || user?.signInDetails?.loginId) {
+            return user.userId || user.username || user.signInDetails.loginId;
+        }
+        
+        // For anonymous users, use localStorage-based ID
+        let anonId = localStorage.getItem('sahayak_anon_id');
+        if (!anonId) {
+            anonId = `anon-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
+            localStorage.setItem('sahayak_anon_id', anonId);
+        }
+        return anonId;
+    };
+    
+    const userId = getUserId();
+    
+    // Debug logging
+    useEffect(() => {
+        console.log('🔍 User object:', user);
+        console.log('🆔 Extracted userId:', userId);
+    }, [user, userId]);
 
     // Request GPS location once on mount
     useEffect(() => {
@@ -37,7 +64,7 @@ export function useChat() {
         if (initialized.current) return;
         initialized.current = true;
 
-        createSession()
+        createSession(userId)
             .then((data) => {
                 setSessionId(data.session_id);
             })
@@ -46,7 +73,58 @@ export function useChat() {
                 // Fallback: generate a local ID
                 setSessionId(`local-${Date.now().toString(36)}`);
             });
-    }, []);
+    }, [userId]);
+
+    const loadExistingSession = useCallback(
+        async (existingSessionId) => {
+            if (!userId) return;
+            setIsLoading(true);
+            setError(null);
+
+            try {
+                const data = await loadSession(existingSessionId, userId);
+                setSessionId(data.session_id);
+                
+                // Convert DynamoDB messages to UI format
+                const loadedMessages = data.messages.map((msg, idx) => ({
+                    id: Date.now() + idx,
+                    role: msg.role,
+                    content: msg.content,
+                    timestamp: new Date(msg.timestamp),
+                }));
+                
+                setMessages(loadedMessages);
+                
+                if (data.agent_info) {
+                    setAgentInfo(data.agent_info);
+                }
+            } catch (err) {
+                setError('Failed to load session');
+                console.error('Load session error:', err);
+            } finally {
+                setIsLoading(false);
+            }
+        },
+        [userId]
+    );
+
+    const createNewSession = useCallback(async () => {
+        setIsLoading(true);
+        try {
+            const data = await createSession(userId);
+            setSessionId(data.session_id);
+            setMessages([]);
+            setAgentInfo({
+                activeAgent: 'legal',
+                workflowStatus: 'awaiting_docs',
+            });
+        } catch (err) {
+            console.error('Failed to create new session:', err);
+            setSessionId(`local-${Date.now().toString(36)}`);
+        } finally {
+            setIsLoading(false);
+        }
+    }, [userId]);
 
     const send = useCallback(
         async (text) => {
@@ -63,7 +141,7 @@ export function useChat() {
             setIsLoading(true);
 
             try {
-                const response = await sendMessage(sessionId, text, language, userCoords.current);
+                const response = await sendMessage(sessionId, text, language, userCoords.current, userId);
 
                 const assistantMsg = {
                     id: Date.now() + 1,
@@ -163,8 +241,11 @@ export function useChat() {
         isLoading,
         error,
         agentInfo,
+        userId,
         send,
         upload,
         clearMessages,
+        loadExistingSession,
+        createNewSession,
     };
 }

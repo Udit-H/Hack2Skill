@@ -7,6 +7,7 @@ import Sidebar from './Sidebar';
 import ChatWindow from './ChatWindow';
 import InputBar from './InputBar';
 import PanicButton from './PanicButton';
+import SessionList from './SessionList';
 import { useChat } from '../hooks/useChat';
 import { panicWipe } from '../utils/api';
 
@@ -14,8 +15,19 @@ export default function ChatApp() {
   const { user, logout } = useAuth();
   const { language, setLanguage } = useLanguage();
   const navigate = useNavigate();
-  const { messages, sessionId, isLoading, error, agentInfo, send, upload, clearMessages } =
-    useChat();
+  const { 
+    messages, 
+    sessionId, 
+    isLoading, 
+    error, 
+    agentInfo, 
+    userId,
+    send, 
+    upload, 
+    clearMessages,
+    loadExistingSession,
+    createNewSession,
+  } = useChat();
 
   const t = (key) => getTranslation(key, language);
 
@@ -48,6 +60,17 @@ export default function ChatApp() {
     navigate('/login');
   };
 
+  const handleSelectSession = useCallback(
+    async (selectedSessionId) => {
+      await loadExistingSession(selectedSessionId);
+    },
+    [loadExistingSession]
+  );
+
+  const handleNewChat = useCallback(async () => {
+    await createNewSession();
+  }, [createNewSession]);
+
   return (
     <div className="app-container">
       <Sidebar sessionId={sessionId} agentInfo={agentInfo} onLogout={handleLogout} />
@@ -66,6 +89,13 @@ export default function ChatApp() {
           </div>
 
           <div className="chat-header-actions">
+            <SessionList
+              userId={userId}
+              currentSessionId={sessionId}
+              onSelectSession={handleSelectSession}
+              onNewChat={handleNewChat}
+            />
+
             <select
               className="lang-selector"
               value={language}

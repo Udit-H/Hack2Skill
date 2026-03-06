@@ -34,6 +34,7 @@ from slowapi.middleware import SlowAPIMiddleware
 from models.session import SessionState, AgentType, AgentActionType
 from core.memory import MemoryManager
 from core.orchestrator import Orchestrator
+from services.chat_storage_service import ChatStorageService
 
 # ---------------------------------------------------------------------------
 # Rate Limiter Configuration
@@ -45,6 +46,9 @@ limiter = Limiter(key_func=get_remote_address)
 # In-memory session store (SQLite migration later)
 # ---------------------------------------------------------------------------
 sessions: dict[str, dict] = {}
+
+# Global chat storage service
+chat_storage = ChatStorageService()
 
 
 def get_or_create_session(session_id: str) -> dict:
@@ -121,6 +125,7 @@ class ChatRequest(BaseModel):
     language: str = "en"
     latitude: Optional[float] = None
     longitude: Optional[float] = None
+    user_id: Optional[str] = None  # User email/phone for session tracking
 
 
 class ChatResponse(BaseModel):
@@ -142,16 +147,29 @@ class PanicRequest(BaseModel):
     session_id: str
 
 
+class SessionListRequest(BaseModel):
+    user_id: str  # Email or phone number
+
+
+class LoadSessionRequest(BaseModel):
+    session_id: str
+    user_id: str
+
+
 # ---------------------------------------------------------------------------
 # Endpoints
 # ---------------------------------------------------------------------------
 
 @app.post("/api/session", response_model=SessionResponse)
 @limiter.limit("10/minute")
-async def create_session(request: Request):
+async def create_session(request: Request, req: Optional[SessionListRequest] = None):
     """Create a new session and return its ID."""
     session_id = f"s-{uuid.uuid4().hex[:12]}"
     sess = get_or_create_session(session_id)
+    
+    # Store user_id if provided
+    if req and req.user_id:
+        sess["state"].user_phone = req.user_id
 
     return SessionResponse(
         session_id=session_id,
@@ -206,6 +224,35 @@ async def chat(request: Request, req: ChatRequest):
 
         # Update memory
         memory.add_turn(user_message=req.message, ai_message=reply)
+        
+        # Persist chat messages to DynamoDB
+        user_id = req.user_id or state.user_phone
+        await chat_storage.save_message(
+            session_id=req.session_id,
+            role='user',
+            content=req.message,
+            agent_type=state.active_agent.value,
+            user_id=user_id,
+        )
+        
+        # Save assistant response with metadata
+        response_metadata = {}
+        if state.last_agent_response:
+            response_metadata = {
+                'progress_status': state.last_agent_response.get('progress_status'),
+                'is_loading': state.last_agent_response.get('is_loading'),
+                'error_message': state.last_agent_response.get('error_message'),
+                'download_urls': state.last_agent_response.get('download_urls'),
+            }
+        
+        await chat_storage.save_message(
+            session_id=req.session_id,
+            role='assistant',
+            content=reply,
+            agent_type=state.active_agent.value,
+            metadata=response_metadata if response_metadata else None,
+            user_id=user_id,
+        )
         
         # Extract progress/error info from cached agent response
         progress_status = None
@@ -359,12 +406,74 @@ async def download_draft(session_id: str, filename: str):
     )
 
 
+@app.get("/api/chat-history/{session_id}")
+@limiter.limit("10/minute")
+async def get_chat_history(request: Request, session_id: str, limit: int = 50):
+    """Retrieve chat history from DynamoDB for a session."""
+    try:
+        messages = await chat_storage.get_session_history(session_id, limit=limit)
+        return {
+            "success": True,
+            "session_id": session_id,
+            "message_count": len(messages),
+            "messages": messages,
+        }
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Failed to retrieve history: {str(e)}")
+
+
+@app.post("/api/sessions/list")
+@limiter.limit("10/minute")
+async def list_user_sessions(request: Request, req: SessionListRequest):
+    """List all chat sessions for a user."""
+    try:
+        sessions = await chat_storage.list_user_sessions(req.user_id, limit=20)
+        return {
+            "success": True,
+            "user_id": req.user_id,
+            "session_count": len(sessions),
+            "sessions": sessions,
+        }
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Failed to list sessions: {str(e)}")
+
+
+@app.post("/api/sessions/load")
+@limiter.limit("10/minute")
+async def load_session(request: Request, req: LoadSessionRequest):
+    """Load an existing session with its chat history."""
+    try:
+        # Get chat history
+        messages = await chat_storage.get_session_history(req.session_id, limit=100)
+        
+        # Get or create session state
+        sess = get_or_create_session(req.session_id)
+        state = sess["state"]
+        state.user_phone = req.user_id
+        
+        # Return session info with history
+        return {
+            "success": True,
+            "session_id": req.session_id,
+            "messages": messages,
+            "agent_info": {
+                "activeAgent": state.active_agent.value,
+                "workflowStatus": _get_workflow_status(state),
+            }
+        }
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Failed to load session: {str(e)}")
+
+
 @app.post("/api/panic")
 @limiter.limit("1/minute")
 async def panic_wipe(request: Request, req: PanicRequest):
     """Emergency session wipe — delete all data for this session."""
     if req.session_id in sessions:
         sess = sessions.pop(req.session_id)
+
+        # Clear DynamoDB chat history
+        await chat_storage.delete_session_history(req.session_id)
 
         # Clear Redis memory too
         try:

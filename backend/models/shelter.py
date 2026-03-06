@@ -1,4 +1,4 @@
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, field_validator
 from typing import Optional, List
 from enum import Enum
 
@@ -41,3 +41,9 @@ class ShelterAgentState(BaseModel):
     selected_shelter_ids: Optional[List[int]] = Field(default_factory=list, description="Shelters the user picked.")
     matched_shelters: List[ShelterProfile] = Field(default_factory=list)
     next_question_for_user: Optional[str] = Field(None)
+
+    @field_validator('matched_shelters', mode='before')
+    @classmethod
+    def coerce_shelters_null(cls, v):
+        """LLM sometimes returns null instead of []. Coerce to empty list."""
+        return v if v is not None else []

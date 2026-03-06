@@ -1,9 +1,10 @@
 import os
+import logging
 import jinja2
 
 from config.translations import get_translated_response
 from models.enums import CrisisCategory
-from models.legal import LegalAgentState, WorkflowStatus
+from models.legal import LegalAgentState, WorkflowStatus, LegalDraftPayload, DraftType
 from models.triage import TriageState
 from models.session import SessionState, AgentResponse, AgentActionType, AgentType # FIX: Added Global States
 from services.llm_service import LLMService
@@ -43,10 +44,10 @@ class LegalAgent:
                 current_state.extracted_doc_data = f"OCR failed: {str(e)}"
                 print(f"❌ OCR failed: {e}")
 
-        # Async RAG
+        # RAG (synchronous — uses sync Cohere + ChromaDB clients)
         if not current_state.retrieved_legal_context:
             rag_query = f"Laws regarding {triage.category.value}: {triage.incident_summary}"
-            response = await self.rag_service.search(rag_query)
+            response = self.rag_service.search(rag_query)
             current_state.retrieved_legal_context = response.answer
 
         # --- PHASE 2: SELECT PROMPT BY CRISIS CATEGORY ---
@@ -85,7 +86,6 @@ class LegalAgent:
 
         # Initialize Legal state if it doesn't exist yet
         if not session.legal:
-            from models.legal import LegalAgentState
             session.legal = LegalAgentState()
             
         current_state = session.legal
@@ -110,30 +110,72 @@ class LegalAgent:
 
         session.legal = updated_state
 
+        # CODE-LEVEL FALLBACK: If LLM set READY_TO_DRAFT but forgot to populate drafts_to_generate,
+        # build them programmatically from triage data (same pattern as shelter agent).
+        if (updated_state.workflow_status == WorkflowStatus.READY_TO_DRAFT 
+            and not updated_state.drafts_to_generate):
+            logging.warning("LLM reached READY_TO_DRAFT but drafts_to_generate is empty — building from triage data.")
+            
+            base_payload = dict(
+                applicant_name=triage.victim_name or "Applicant",
+                opponent_name=triage.aggressor_name,
+                property_address=triage.property_address,
+                monthly_income=0,
+                caste_category="General",
+                draft_body_summary=triage.incident_summary or "Details to be provided.",
+            )
+
+            category = triage.category
+            drafts = []
+
+            if category == CrisisCategory.ILLEGAL_EVICTION:
+                if updated_state.user_consent_police:
+                    drafts.append(LegalDraftPayload(draft_type=DraftType.POLICE_INTIMATION, **base_payload))
+                drafts.append(LegalDraftPayload(draft_type=DraftType.CIVIL_INJUNCTION_PETITION, **base_payload))
+                drafts.append(LegalDraftPayload(draft_type=DraftType.KSLSA_LEGAL_AID, **base_payload))
+
+            elif category == CrisisCategory.DOMESTIC_VIOLENCE:
+                drafts.append(LegalDraftPayload(draft_type=DraftType.SAFETY_PLAN, **base_payload))
+                drafts.append(LegalDraftPayload(draft_type=DraftType.DIR_FORM_1, **base_payload))
+                drafts.append(LegalDraftPayload(draft_type=DraftType.SECTION_12_PETITION, **base_payload))
+                drafts.append(LegalDraftPayload(draft_type=DraftType.KSLSA_LEGAL_AID, **base_payload))
+
+            elif category == CrisisCategory.SENIOR_CITIZEN_NEGLECT:
+                drafts.append(LegalDraftPayload(draft_type=DraftType.SENIOR_CITIZEN_TRIBUNAL, **base_payload))
+                drafts.append(LegalDraftPayload(draft_type=DraftType.KSLSA_LEGAL_AID, **base_payload))
+                if updated_state.user_consent_police:
+                    drafts.append(LegalDraftPayload(draft_type=DraftType.POLICE_INTIMATION, **base_payload))
+            else:
+                # Fallback: at least generate legal aid application
+                drafts.append(LegalDraftPayload(draft_type=DraftType.KSLSA_LEGAL_AID, **base_payload))
+
+            updated_state.drafts_to_generate = drafts
+            session.legal = updated_state
+            logging.info(f"Built {len(drafts)} draft payloads from triage data.")
+
         # Build the exact instruction for the Orchestrator
         response = AgentResponse(action_type=AgentActionType.REPLY_TO_USER)
 
-        # Map workflow status to response keys for translation
-        status_key = updated_state.workflow_status.value if updated_state.workflow_status else "default"
-        status_key = status_key.lower()  # Normalize to lowercase
+        # Prefer LLM's contextual response, fall back to static translation
+        llm_reply = updated_state.next_question_for_user
 
         if updated_state.workflow_status == WorkflowStatus.AWAITING_DOCS:
-            response.reply_message = get_translated_response("awaiting_docs", language)
+            response.reply_message = llm_reply or get_translated_response("awaiting_docs", language)
             
         elif updated_state.workflow_status == WorkflowStatus.AWAITING_USER_INFO:
-            response.reply_message = get_translated_response("awaiting_user_info", language)
+            response.reply_message = llm_reply or get_translated_response("awaiting_user_info", language)
             
         elif updated_state.workflow_status == WorkflowStatus.AWAITING_CONSENT:
-            response.reply_message = get_translated_response("awaiting_consent", language)
+            response.reply_message = llm_reply or get_translated_response("awaiting_consent", language)
             
         elif updated_state.workflow_status == WorkflowStatus.READY_TO_DRAFT:
-            response.reply_message = get_translated_response("ready_to_draft", language)
+            response.reply_message = llm_reply or get_translated_response("ready_to_draft", language)
             
             # FIX: Crucial Orchestrator Handoff!
             # Legal work is done. Hand control back to Orchestrator to decide next steps (e.g. Shelter Agent)
             response.action_type = AgentActionType.SWITCH_AGENT
             response.next_active_agent = AgentType.ORCHESTRATOR
         else:
-            response.reply_message = "I'm here to help with your legal situation. Please tell me more about what you're experiencing."
+            response.reply_message = llm_reply or "I'm here to help with your legal situation. Please tell me more about what you're experiencing."
 
         return response

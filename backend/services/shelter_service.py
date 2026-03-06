@@ -1,10 +1,32 @@
 import logging
+import time
 from supabase import create_client, Client
 from thefuzz import fuzz
 
 from config.config import get_settings
 from models.shelter import ShelterProfile
 from models.enums import CrisisCategory
+
+
+def _rpc_with_retry(supabase: Client, fn_name: str, params: dict, max_retries: int = 3) -> list:
+    """Execute a Supabase RPC call with retry on HTTP/2 connection errors."""
+    for attempt in range(1, max_retries + 1):
+        try:
+            response = supabase.rpc(fn_name, params).execute()
+            return response.data or []
+        except Exception as e:
+            err_str = str(e).lower()
+            is_retryable = any(kw in err_str for kw in [
+                "connectionterminated", "remoteprotocolerror", "connectionreset",
+                "connection", "reset", "broken", "eof", "closed",
+            ])
+            if is_retryable and attempt < max_retries:
+                wait = 0.5 * attempt
+                logging.warning(f"[SUPABASE] {fn_name} attempt {attempt} failed ({e}). Retrying in {wait}s...")
+                time.sleep(wait)
+            else:
+                logging.error(f"[SUPABASE] {fn_name} failed after {attempt} attempt(s): {e}")
+                raise
 
 class ShelterService:
     def __init__(self):
@@ -31,39 +53,24 @@ class ShelterService:
         logging.info(f"Executing STRICT Supabase RPC (5km) for: {target_category}, Pref: {user_pref}")
         
         # 1. Try Strict Match (5km, Exact Category, Exact Preference)
-        response = self.supabase.rpc(
-# ---------------------------------------------------------------------------------------
-# NOTE:-The below named rpc function is not tested. If fails then use get_strict_shelters
-# ---------------------------------------------------------------------------------------
-            'get_strict_shelters_free',
-            {
-                'user_lat': lat,
-                'user_lng': lng,
-                'radius_meters': 5000,
-                'target_category': target_category,
-                'user_preference': user_pref
-            }
-        ).execute()
-
-        shelters_data = response.data
+        shelters_data = _rpc_with_retry(self.supabase, 'get_strict_shelters_free', {
+            'user_lat': lat,
+            'user_lng': lng,
+            'radius_meters': 5000,
+            'target_category': target_category,
+            'user_preference': user_pref
+        })
 
         # 2. Trigger Fallback if Strict Fails (15km, Soft Preference Ranking)
         if not shelters_data:
             logging.warning("Strict match returned 0 results. Triggering FALLBACK RPC (15km)...")
-            response = self.supabase.rpc(
-# ---------------------------------------------------------------------------------------
-# NOTE:-The below named rpc function is not tested. If fails then use get_fallback_shelters
-# ---------------------------------------------------------------------------------------
-                'get_fallback_shelters_free',
-                {
-                    'user_lat': lat,
-                    'user_lng': lng,
-                    'expanded_radius_meters': 15000,
-                    'target_category': target_category,
-                    'user_preference': user_pref
-                }
-            ).execute()
-            shelters_data = response.data
+            shelters_data = _rpc_with_retry(self.supabase, 'get_fallback_shelters_free', {
+                'user_lat': lat,
+                'user_lng': lng,
+                'expanded_radius_meters': 15000,
+                'target_category': target_category,
+                'user_preference': user_pref
+            })
 
         # 3. Map Raw DB Dictionaries to Pydantic Models
         raw_shelters =[]
@@ -118,21 +125,15 @@ class ShelterService:
     async def find_all_shelters(self, lat: float, lng: float, radius_km: int = 25) -> list[ShelterProfile]:
         """Get ALL shelters within radius, regardless of category"""
         try:
-            response = self.supabase.rpc(
-# ---------------------------------------------------------------------------------------
-# NOTE:-The below named rpc function is not tested. If fails then use get_strict_shelters
-# ---------------------------------------------------------------------------------------
-                'get_fallback_shelters_free',
-                {
-                    'user_lat': lat,
-                    'user_lng': lng,
-                    'expanded_radius_meters': radius_km * 1000,
-                    'target_category': '',  # Empty = match all
-                    'user_preference': ''
-                }
-            ).execute()
+            data = _rpc_with_retry(self.supabase, 'get_fallback_shelters_free', {
+                'user_lat': lat,
+                'user_lng': lng,
+                'expanded_radius_meters': radius_km * 1000,
+                'target_category': '',  # Empty = match all
+                'user_preference': ''
+            })
             
-            if response.data:
+            if data:
                 return [
                     ShelterProfile(
                         shelter_id=row['shelter_id'],
@@ -143,7 +144,7 @@ class ShelterService:
                         distance_km=round(row['dist_meters'] / 1000, 2) if row.get('dist_meters') else None,
                         google_maps_url=f"https://www.google.com/maps/search/?api=1&query={row['latitude']},{row['longitude']}"
                     )
-                    for row in response.data
+                    for row in data
                 ]
             return []
         except Exception as e:

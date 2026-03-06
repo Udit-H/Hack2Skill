@@ -13,6 +13,24 @@ export function useChat() {
         workflowStatus: 'awaiting_docs',
     });
     const initialized = useRef(false);
+    const userCoords = useRef(null);
+
+    // Request GPS location once on mount
+    useEffect(() => {
+        if (navigator.geolocation) {
+            navigator.geolocation.getCurrentPosition(
+                (pos) => {
+                    userCoords.current = {
+                        latitude: pos.coords.latitude,
+                        longitude: pos.coords.longitude,
+                    };
+                    console.log('📍 GPS acquired:', userCoords.current);
+                },
+                (err) => console.log('📍 GPS unavailable, will use text fallback:', err.message),
+                { enableHighAccuracy: true, timeout: 10000 }
+            );
+        }
+    }, []);
 
     // Initialize session on mount
     useEffect(() => {
@@ -45,7 +63,7 @@ export function useChat() {
             setIsLoading(true);
 
             try {
-                const response = await sendMessage(sessionId, text, language);
+                const response = await sendMessage(sessionId, text, language, userCoords.current);
 
                 const assistantMsg = {
                     id: Date.now() + 1,

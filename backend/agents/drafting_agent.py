@@ -77,7 +77,18 @@ class DraftingAgent:
         # Initialize drafting state
         if not session.drafting:
             session.drafting = DraftingAgentState()
-
+        # Guard: if already completed, don't re-generate
+        if session.drafting.workflow_status == DraftingWorkflowStatus.COMPLETED and session.drafting.generated_drafts:
+            logging.info("Drafting already completed — skipping re-generation.")
+            draft_list = "\n".join([
+                f"📄 **{d.title}** — [Download]({d.download_url})"
+                for d in session.drafting.generated_drafts
+            ])
+            return AgentResponse(
+                action_type=AgentActionType.SWITCH_AGENT,
+                next_active_agent=AgentType.COMPLETED,
+                reply_message=f"Your documents are ready:\n\n{draft_list}",
+            )
         session.drafting.workflow_status = DraftingWorkflowStatus.GENERATING
         generated = []
         errors = []

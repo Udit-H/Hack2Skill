@@ -1,6 +1,9 @@
 import asyncio
 import uuid
 import sys
+import os
+
+sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
 
 from models.session import SessionState, AgentType
 from core.memory import MemoryManager
@@ -22,6 +25,7 @@ async def main():
         # Active agent starts as ORCHESTRATOR so it evaluates rules immediately.
         session = SessionState(
             session_id=session_id,
+            user_phone="+91-0000000000",
             active_agent=AgentType.ORCHESTRATOR
         )
     except Exception as e:
@@ -71,8 +75,12 @@ async def main():
             break
             
         # E. Get Next User Input
-        user_input = input("You: ")
+        user_input = input("You: ").strip()
         doc_path = None # Reset doc path
+        
+        if not user_input:
+            print("[SYSTEM]: Please type a message (or 'exit' to quit).")
+            continue
         
         if user_input.lower() in['exit', 'quit']:
             print("\n[SYSTEM]: Exiting CLI Test.")
@@ -89,5 +97,31 @@ async def main():
             user_input = "I am uploading my rent agreement now."
             print("📎 [SYSTEM]: Simulating document upload...")
 
-if __name__ == "__main__":    
-    asyncio.run(main())
+        elif user_input.lower().startswith('location'):
+            # Simulate GPS: "location 12.9716 77.6412" or just "location" for default Bengaluru
+            parts = user_input.split()
+            if len(parts) >= 3:
+                lat, lng = float(parts[1]), float(parts[2])
+            else:
+                lat, lng = 12.9716, 77.5946  # Central Bengaluru
+            if not session.shelter:
+                from models.shelter import ShelterAgentState
+                session.shelter = ShelterAgentState()
+            session.shelter.user_coordinates = {"lat": lat, "lng": lng}
+            print(f"📍 [SYSTEM]: GPS location set to ({lat}, {lng})")
+            user_input = f"I am sending my live location pin."
+
+if __name__ == "__main__":
+    try:
+        asyncio.run(main())
+    except KeyboardInterrupt:
+        print("\n[SYSTEM]: Interrupted. Exiting...")
+    finally:
+        # Cancel any lingering background tasks to prevent terminal bleed
+        try:
+            loop = asyncio.get_event_loop()
+            pending = asyncio.all_tasks(loop)
+            for task in pending:
+                task.cancel()
+        except RuntimeError:
+            pass

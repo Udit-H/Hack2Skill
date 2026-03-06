@@ -39,21 +39,28 @@ class Orchestrator:
 
         final_reply = response.reply_message
 
-        # 4. HANDLE SEAMLESS HANDOFFS
+        # 4. HANDLE SEAMLESS HANDOFFS (supports chained handoffs: Legal → Drafting → Completed)
         # If the agent just finished its job, it will return SWITCH_AGENT.
-        if response.action_type == AgentActionType.SWITCH_AGENT:
+        # We loop because the NEXT agent may also immediately finish (e.g., Drafting generates PDFs in one shot).
+        while response.action_type == AgentActionType.SWITCH_AGENT:
             logging.info(f"Agent Handoff Triggered. Old Agent finished.")
             
             # Recalculate routing rules to find the NEXT agent
             self._determine_next_agent(session)
             logging.info(f"Orchestrator routed next step to: {session.active_agent.value}")
             
-            # If there is another task to do, instantly trigger the next agent's opening message!
-            if session.active_agent != AgentType.COMPLETED:
-                next_agent_response = await self._dispatch_to_agent(session, memory_manager, user_message=None, document_path=None)
-                
-                # Combine the goodbye message of Agent A with the opening message of Agent B
-                final_reply = f"{response.reply_message}\n\n{next_agent_response.reply_message}"
+            # If everything is done, stop the chain
+            if session.active_agent == AgentType.COMPLETED:
+                break
+            
+            # Trigger the next agent's opening message
+            next_agent_response = await self._dispatch_to_agent(session, memory_manager, user_message=None, document_path=None)
+            
+            # Combine replies from the chain
+            final_reply = f"{final_reply}\n\n{next_agent_response.reply_message}"
+            
+            # Continue the loop — if this agent ALSO returned SWITCH_AGENT, handle it
+            response = next_agent_response
 
         return final_reply
 

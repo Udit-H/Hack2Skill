@@ -49,6 +49,6 @@ class TriageAgent:
             response.action_type = AgentActionType.SWITCH_AGENT
             response.next_active_agent = AgentType.ORCHESTRATOR
         else:
-            response.reply_message = updated_state.next_question_for_user
+            response.reply_message = updated_state.next_question_for_user or "Could you tell me more about your situation so I can help you better?"
             
         return response

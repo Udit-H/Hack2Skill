@@ -11,13 +11,18 @@ from datetime import datetime
 from typing import Optional
 
 import jinja2
-from weasyprint import HTML
 
 from models.session import SessionState, AgentResponse, AgentActionType, AgentType
 from models.legal import DraftType, LegalDraftPayload
 from models.drafting import DraftingAgentState, DraftingWorkflowStatus, GeneratedDraft
 
 logging.basicConfig(level=logging.INFO)
+
+WEASYPRINT_IMPORT_ERROR_MESSAGE = (
+    "PDF generation dependency is not available. WeasyPrint requires native system "
+    "libraries (glib/pango/cairo). Install those libraries for your OS and ensure "
+    "their DLLs are on PATH, then restart the server."
+)
 
 # Map DraftType → Jinja2 HTML template filename
 TEMPLATE_MAP = {
@@ -178,9 +183,7 @@ class DraftingAgent:
         os.makedirs(output_dir, exist_ok=True)
         output_path = os.path.join(output_dir, filename)
 
-        HTML(string=html_content, base_url=os.path.join(
-            os.path.dirname(__file__), '..', 'templates'
-        )).write_pdf(output_path)
+        self._write_pdf(html_content, output_path)
 
         return GeneratedDraft(
             draft_type=payload.draft_type.value,
@@ -216,9 +219,7 @@ class DraftingAgent:
         os.makedirs(output_dir, exist_ok=True)
         output_path = os.path.join(output_dir, filename)
 
-        HTML(string=html_content, base_url=os.path.join(
-            os.path.dirname(__file__), '..', 'templates'
-        )).write_pdf(output_path)
+        self._write_pdf(html_content, output_path)
 
         return GeneratedDraft(
             draft_type=DraftType.SHELTER_REFERRAL.value,
@@ -230,6 +231,25 @@ class DraftingAgent:
     # ---------------------------------------------------------------
     # Helpers
     # ---------------------------------------------------------------
+
+    def _write_pdf(self, html_content: str, output_path: str) -> None:
+        """Render HTML to PDF with lazy WeasyPrint import.
+
+        We keep the import inside this method so the API can boot even on
+        environments that don't have WeasyPrint native runtime deps yet.
+        """
+        try:
+            from weasyprint import HTML
+        except Exception as exc:
+            raise RuntimeError(WEASYPRINT_IMPORT_ERROR_MESSAGE) from exc
+
+        try:
+            HTML(
+                string=html_content,
+                base_url=os.path.join(os.path.dirname(__file__), '..', 'templates')
+            ).write_pdf(output_path)
+        except OSError as exc:
+            raise RuntimeError(WEASYPRINT_IMPORT_ERROR_MESSAGE) from exc
 
     def _build_template_context(
         self, session: SessionState, payload: LegalDraftPayload

@@ -16,6 +16,7 @@ import jinja2
 from models.session import SessionState, AgentResponse, AgentActionType, AgentType
 from models.legal import DraftType, LegalDraftPayload
 from models.drafting import DraftingAgentState, DraftingWorkflowStatus, GeneratedDraft
+from services.draft_storage_service import DraftStorageService
 
 logging.basicConfig(level=logging.INFO)
 
@@ -69,6 +70,7 @@ class DraftingAgent:
             loader=jinja2.FileSystemLoader(searchpath=template_dir)
         )
         self.output_base = os.path.join(tempfile.gettempdir(), "sahayak_drafts")
+        self.draft_storage = DraftStorageService()
 
     async def process_turn(
         self,
@@ -211,6 +213,12 @@ class DraftingAgent:
 
         self._write_pdf(html_content, output_path)
 
+        # Push generated file to S3 (best-effort; local file remains fallback)
+        try:
+            self.draft_storage.upload_draft(output_path, session.session_id, filename)
+        except Exception as exc:
+            logging.warning(f"S3 upload failed for {filename}: {exc}")
+
         return GeneratedDraft(
             draft_type=payload.draft_type.value,
             title=DRAFT_TITLES.get(payload.draft_type, payload.draft_type.value),
@@ -246,6 +254,12 @@ class DraftingAgent:
         output_path = os.path.join(output_dir, filename)
 
         self._write_pdf(html_content, output_path)
+
+        # Push generated file to S3 (best-effort; local file remains fallback)
+        try:
+            self.draft_storage.upload_draft(output_path, session.session_id, filename)
+        except Exception as exc:
+            logging.warning(f"S3 upload failed for {filename}: {exc}")
 
         return GeneratedDraft(
             draft_type=DraftType.SHELTER_REFERRAL.value,

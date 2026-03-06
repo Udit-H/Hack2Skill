@@ -22,7 +22,7 @@ else:
 
 from fastapi import FastAPI, UploadFile, File, Form, HTTPException, Request
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import FileResponse, JSONResponse
+from fastapi.responses import FileResponse, JSONResponse, RedirectResponse
 from pydantic import BaseModel
 from typing import Optional
 from slowapi import Limiter
@@ -35,6 +35,7 @@ from models.session import SessionState, AgentType, AgentActionType
 from core.memory import MemoryManager
 from core.orchestrator import Orchestrator
 from services.chat_storage_service import ChatStorageService
+from services.draft_storage_service import DraftStorageService
 
 # ---------------------------------------------------------------------------
 # Rate Limiter Configuration
@@ -49,6 +50,7 @@ sessions: dict[str, dict] = {}
 
 # Global chat storage service
 chat_storage = ChatStorageService()
+draft_storage = DraftStorageService()
 
 
 def get_or_create_session(session_id: str) -> dict:
@@ -397,7 +399,16 @@ async def upload_document(
 
 @app.get("/api/drafts/{session_id}/{filename}")
 async def download_draft(session_id: str, filename: str):
-    """Download a generated PDF draft."""
+    """Download a generated PDF draft from S3 (with local fallback)."""
+    # Prefer S3 storage: generate a fresh presigned URL each request
+    try:
+        if draft_storage.object_exists(session_id, filename):
+            presigned_url = draft_storage.generate_presigned_download_url(session_id, filename)
+            return RedirectResponse(url=presigned_url, status_code=307)
+    except Exception as e:
+        print(f"⚠️  S3 draft lookup failed for {session_id}/{filename}: {e}")
+
+    # Backward-compatible fallback to local temp file
     draft_path = os.path.join(tempfile.gettempdir(), "sahayak_drafts", session_id, filename)
     
     if not os.path.exists(draft_path):

@@ -8,10 +8,9 @@ pydantic==2.12.5
 pydantic-settings==2.13.1
 python-dotenv==1.2.1
 
-# LLM
+# LLM (Bedrock primary, Groq fallback — both via openai client)
 openai==2.24.0
 instructor==1.14.5
-google-genai==0.4.0
 
 # Templates
 jinja2==3.1.6

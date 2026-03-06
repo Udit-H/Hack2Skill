@@ -1,12 +1,13 @@
 import logging
+import re
 from typing import List, Dict, Any, Optional
 from pydantic import BaseModel, Field
-import openai
 import cohere
 import chromadb
 from urllib.parse import urlparse
 
 from config.config import Settings
+from services.llm_service import LLMService
 from utils.chunker import TableAwareChunker
 from services.ocr_service import DocumentIntelligenceService
 
@@ -53,11 +54,8 @@ class RAGService:
     def __init__(self):
         settings = Settings()
         
-        # LLM Client
-        self.llm_client = openai.OpenAI(
-            api_key=settings.llm.api_key,
-            base_url=settings.llm.base_url
-        )
+        # LLM Client (Bedrock → Groq fallback)
+        self.llm = LLMService()
         
         # Cohere Client
         self.cohere_client = cohere.Client(api_key=settings.cohere.api_key)
@@ -138,6 +136,77 @@ class RAGService:
             logging.error(f"Ingestion failed: {e}")
             return {"success": False, "error": str(e)}
 
+    async def ingest_text(self, markdown_content: str, source: str, doc_type: str = "legal") -> Dict[str, Any]:
+        """
+        Ingests plain text/markdown content directly into ChromaDB (bypasses OCR).
+        Use this for curated knowledge base documents.
+
+        Args:
+            markdown_content: The markdown/text content to ingest
+            source: Source identifier (e.g., "PWDVA 2005")
+            doc_type: Document category tag (e.g., "bare_act", "procedure", "resource")
+        """
+        try:
+            logging.info(f"Ingesting text document: {source}")
+            if not markdown_content.strip():
+                raise ValueError("Content is empty")
+
+            # Create unique prefix from source to avoid ID collisions across documents
+            slug = re.sub(r'[^a-z0-9]+', '_', source.lower()).strip('_')[:30]
+
+            child_chunks, _ = await self.chunker.process_document(markdown_content)
+
+            if not child_chunks:
+                raise ValueError("No chunks produced from content")
+
+            # Prefix IDs and add source metadata
+            for chunk in child_chunks:
+                chunk['child_id'] = f"{slug}_{chunk['child_id']}"
+                chunk['metadata']['source'] = source
+                chunk['metadata']['doc_type'] = doc_type
+                chunk['metadata']['parent_id'] = f"{slug}_{chunk['metadata']['parent_id']}"
+
+            content_list = [doc['content'] for doc in child_chunks]
+
+            # Embed in batches (Cohere limit ~96 texts per call)
+            BATCH_SIZE = 96
+            all_embeddings = []
+            for i in range(0, len(content_list), BATCH_SIZE):
+                batch = content_list[i:i + BATCH_SIZE]
+                try:
+                    resp = await self.async_cohere_client.embed(
+                        model="embed-english-v3.0",
+                        input_type="search_document",
+                        texts=batch,
+                        embedding_types=["float"]
+                    )
+                except Exception:
+                    resp = await self.async_cohere_client.embed(
+                        model="embed-multilingual-v3.0",
+                        input_type="search_document",
+                        texts=batch,
+                        embedding_types=["float"]
+                    )
+                all_embeddings.extend(resp.embeddings.float)
+
+            # Upsert into ChromaDB in batches (handles re-ingestion gracefully)
+            CHROMA_BATCH = 100
+            for i in range(0, len(child_chunks), CHROMA_BATCH):
+                end = min(i + CHROMA_BATCH, len(child_chunks))
+                self.collection.upsert(
+                    ids=[doc["child_id"] for doc in child_chunks[i:end]],
+                    embeddings=all_embeddings[i:end],
+                    documents=content_list[i:end],
+                    metadatas=[doc['metadata'] for doc in child_chunks[i:end]]
+                )
+
+            logging.info(f"Text ingestion complete: {len(child_chunks)} chunks from '{source}'")
+            return {"success": True, "chunks_stored": len(child_chunks), "source": source}
+
+        except Exception as e:
+            logging.error(f"Text ingestion failed for '{source}': {e}")
+            return {"success": False, "error": str(e), "source": source}
+
     # ============== Query Parsing ==============
     
     def _parse_query(self, user_query: str) -> ReasoningQueryPlan:
@@ -150,16 +219,13 @@ Return a JSON object with:
 - user_query: the original query
 - reasoning_sub_questions: list of sub-questions"""
 
-        response = self.llm_client.beta.chat.completions.parse(
-            model="gemini-2.5-flash",
+        return self.llm.create_structured_sync(
+            response_model=ReasoningQueryPlan,
             messages=[
                 {"role": "system", "content": prompt},
                 {"role": "user", "content": user_query}
             ],
-            response_format=ReasoningQueryPlan
         )
-        
-        return response.choices[0].message.parsed
 
     # ============== Search Query Generation ==============
     
@@ -176,16 +242,15 @@ Return a JSON object with:
 - user_query: the original query  
 - search_queries: list of search queries"""
 
-        response = self.llm_client.beta.chat.completions.parse(
-            model="gemini-2.5-flash",
+        plan = self.llm.create_structured_sync(
+            response_model=SearchQueryPlan,
             messages=[
                 {"role": "system", "content": prompt},
                 {"role": "user", "content": "Generate search queries."}
             ],
-            response_format=SearchQueryPlan
         )
         
-        return response.choices[0].message.parsed.search_queries
+        return plan.search_queries
 
     # ============== Retrieval & Re-ranking ==============
     
@@ -264,13 +329,10 @@ Question: {user_query}
 
 Provide a clear, helpful answer based only on the given context."""
 
-        response = self.llm_client.chat.completions.create(
-            model="gemini-2.5-pro",
+        return self.llm.create_completion_sync(
             messages=[{"role": "user", "content": prompt}],
             temperature=0.25
         )
-        
-        return response.choices[0].message.content or "Unable to generate answer."
 
     # ============== Main Search API ==============
     

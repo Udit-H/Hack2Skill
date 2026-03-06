@@ -11,8 +11,14 @@ class DocumentIntelligenceSettings(BaseSettings):
     endpoint: Optional[str] = os.getenv("DOCUMENT_INTELLIGENCE_ENDPOINT", "")
 
 class LLMSettings(BaseSettings):
-    api_key: str = os.getenv("GEMINI_API_KEY", "")
-    base_url: str = os.getenv("GEMINI_BASE_URL", "https://generativelanguage.googleapis.com/v1beta/openai/")
+    # AWS Bedrock (Primary LLM)
+    aws_region: str = os.getenv("AWS_REGION", "us-east-1")
+    aws_access_key_id: Optional[str] = os.getenv("AWS_ACCESS_KEY_ID")
+    aws_secret_access_key: Optional[str] = os.getenv("AWS_SECRET_ACCESS_KEY")
+    bedrock_model_id: str = os.getenv("BEDROCK_MODEL_ID", "us.meta.llama3-2-90b-instruct-v1:0")
+    # Groq (Fallback LLM)
+    groq_api_key: str = os.getenv("GROQ_API_KEY", "")
+    groq_model_id: str = os.getenv("GROQ_MODEL_ID", "llama-3.3-70b-versatile")
 
 class RedisDbSettings(BaseSettings):
     host: Optional[str] = os.getenv("REDIS_HOST", "localhost")

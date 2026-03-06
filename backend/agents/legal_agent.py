@@ -1,14 +1,12 @@
 import os
 import jinja2
-import instructor
-from openai import AsyncOpenAI 
 
-from config.config import get_settings
 from config.translations import get_translated_response
 from models.enums import CrisisCategory
 from models.legal import LegalAgentState, WorkflowStatus
 from models.triage import TriageState
 from models.session import SessionState, AgentResponse, AgentActionType, AgentType # FIX: Added Global States
+from services.llm_service import LLMService
 from services.rag_service import RAGService
 from services.ocr_service import DocumentIntelligenceService 
 
@@ -17,12 +15,7 @@ from core.memory import MemoryManager
 
 class LegalAgent:
     def __init__(self):
-        settings = get_settings()
-        
-        self.client = instructor.from_openai(AsyncOpenAI(
-            api_key=settings.llm.api_key,
-            base_url=settings.llm.base_url
-        ), mode=instructor.Mode.JSON)
+        self.llm = LLMService()
         
         self.ocr_service = DocumentIntelligenceService()
         self.rag_service = RAGService()
@@ -102,8 +95,7 @@ class LegalAgent:
         system_prompt = await self.get_legal_system_prompt(triage, current_state, document_path)
 
         try:
-            updated_state: LegalAgentState = await self.client.chat.completions.create(
-                model="gemini-2.5-flash", 
+            updated_state: LegalAgentState = await self.llm.create_structured(
                 response_model=LegalAgentState,
                 messages=[
                     {"role": "system", "content": system_prompt},

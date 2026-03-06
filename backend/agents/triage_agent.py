@@ -1,20 +1,13 @@
 import os
 import jinja2
-import instructor
-from openai import AsyncOpenAI
 
 from models.session import SessionState, AgentResponse, AgentActionType, AgentType
 from models.triage import TriageState, TriageWorkflowStatus
-from config.config import get_settings
+from services.llm_service import LLMService
 
 class TriageAgent:
     def __init__(self):
-        settings = get_settings()
-
-        self.client = instructor.from_openai(AsyncOpenAI(
-            api_key=settings.llm.api_key,
-            base_url=settings.llm.base_url
-        ), mode=instructor.Mode.JSON)
+        self.llm = LLMService()
         
         prompt_dir = os.path.join(os.path.dirname(__file__), '..', 'prompts')
         self.template_env = jinja2.Environment(loader=jinja2.FileSystemLoader(searchpath=prompt_dir))
@@ -37,8 +30,7 @@ class TriageAgent:
         system_prompt = await self.get_triage_system_prompt(current_state, memory_context)
 
         # Let the LLM evaluate the facts and advance the workflow
-        updated_state: TriageState = await self.client.chat.completions.create(
-            model="gemini-2.5-flash", 
+        updated_state: TriageState = await self.llm.create_structured(
             response_model=TriageState,
             messages=[
                 {"role": "system", "content": system_prompt},

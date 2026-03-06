@@ -1,22 +1,14 @@
 import os
 import jinja2
-import instructor
-from openai import AsyncOpenAI
 
-from config.config import get_settings
 from models.session import SessionState, AgentResponse, AgentActionType, AgentType
 from models.shelter import ShelterAgentState, ShelterWorkflowStatus
+from services.llm_service import LLMService
 from services.shelter_service import ShelterService
 
 class ShelterAgent:
     def __init__(self):
-        settings = get_settings()
-
-        self.client = instructor.from_openai(AsyncOpenAI(
-            api_key=settings.llm.api_key,
-            base_url=settings.llm.base_url
-        ), mode=instructor.Mode.JSON)
-
+        self.llm = LLMService()
         self.db_service = ShelterService()
         
         prompt_dir = os.path.join(os.path.dirname(__file__), '..', 'prompts')
@@ -100,8 +92,7 @@ class ShelterAgent:
             )
 
             # 3. LLM EVALUATION
-            updated_state: ShelterAgentState = await self.client.chat.completions.create(
-                model="gemini-2.5-flash",
+            updated_state: ShelterAgentState = await self.llm.create_structured(
                 response_model=ShelterAgentState,
                 messages=[
                     {"role": "system", "content": system_prompt},

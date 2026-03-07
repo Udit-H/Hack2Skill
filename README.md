@@ -129,53 +129,94 @@ Open **http://localhost:5173** in your browser.
 
 ---
 
-## ☁️ AWS Deployment (Amplify + Backend API)
+## ☁️ AWS Deployment (Amplify + App Runner)
 
-### Frontend on AWS Amplify
+This project consists of two separately deployed services that need to be connected:
+- **Frontend**: AWS Amplify Hosting (React SPA)
+- **Backend**: AWS App Runner (FastAPI API)
 
-This repo is now configured with [amplify.yml](amplify.yml) for Amplify Hosting.
+### Step 1: Deploy Backend on AWS App Runner
 
-In Amplify Console:
+This repo includes [apprunner.yaml](apprunner.yaml) for source-code deployment (no Docker required).
 
-1. Connect this GitHub repository.
-2. Select branch (for example: `main`).
-3. Add environment variables:
-  - `VITE_COGNITO_USER_POOL_ID`
-  - `VITE_COGNITO_CLIENT_ID`
-  - `VITE_COGNITO_REGION`
-  - `VITE_API_BASE_URL` (your backend base URL, e.g. `https://api.example.com`)
-4. Deploy.
+**In AWS App Runner Console:**
 
-### Backend hosting note
+1. **Create Service** → **Source code repository**
+2. Connect this GitHub repo and select branch (e.g., `main`)
+3. **Configuration**: Select **Use a configuration file** → `apprunner.yaml`
+4. **Add Environment Variables** (in App Runner console):
+   ```
+   AWS_ACCESS_KEY_ID=<your-aws-key>
+   AWS_SECRET_ACCESS_KEY=<your-aws-secret>
+   AWS_REGION=us-east-1
+   S3_BUCKET_NAME=<your-s3-bucket>
+   REDIS_HOST=<your-redis-host>
+   REDIS_PORT=6379
+   REDIS_PASSWORD=<your-redis-password>
+   REDIS_DB_NAME=0
+   GEMINI_API_KEY=<your-gemini-key>
+   CORS_ORIGINS=*
+   ```
+   > **Note:** Update `CORS_ORIGINS` after frontend deployment (Step 3)
 
-AWS Amplify Hosting deploys the React frontend, but this backend is a long-running FastAPI service and should be deployed separately (for example on **App Runner**, **ECS Fargate**, or **EC2**).
+5. **Deploy** and wait for service to be running
 
-Once backend is live, set `VITE_API_BASE_URL` in Amplify so frontend calls:
+6. **Copy the App Runner URL** (looks like: `https://xxxxx.us-east-1.awsapprunner.com`)
 
-`https://your-backend-domain/api/...`
+---
 
-### Backend on AWS App Runner (No Docker)
+### Step 2: Deploy Frontend on AWS Amplify
 
-This repo includes [apprunner.yaml](apprunner.yaml) so App Runner can build from source code directly.
+This repo includes [frontend/amplify.yml](frontend/amplify.yml) for Amplify Hosting.
 
-In AWS App Runner:
+**In AWS Amplify Console:**
 
-1. Create service → **Source code repository**.
-2. Connect this GitHub repo and branch.
-3. Configuration file: use **Repository configuration file** (`apprunner.yaml`).
-4. Build/Run are automatically picked up from config:
-  - Install: `pip install -r backend/requirements.txt`
-  - Start: `uvicorn --app-dir backend main:app --host 0.0.0.0 --port 8080`
-5. Add runtime environment variables (App Runner console):
-  - `AWS_ACCESS_KEY_ID`
-  - `AWS_SECRET_ACCESS_KEY`
-  - `AWS_REGION`
-  - `S3_BUCKET_NAME`
-  - `REDIS_HOST`, `REDIS_PORT`, `REDIS_PASSWORD`, `REDIS_DB_NAME`
-  - `GROQ_API_KEY` and/or Bedrock/Gemini variables you use
-  - `CORS_ORIGINS` (include your Amplify domain)
+1. **New App** → **Host web app** → Connect repository
+2. Select this GitHub repo and branch (e.g., `main`)
+3. **Build settings**: Amplify auto-detects `amplify.yml` in frontend/
+4. **Add Environment Variables**:
+   ```
+   VITE_COGNITO_USER_POOL_ID=<your-cognito-pool-id>
+   VITE_COGNITO_CLIENT_ID=<your-cognito-client-id>
+   VITE_COGNITO_REGION=us-east-1
+   VITE_API_BASE_URL=<your-app-runner-url-from-step-1>
+   ```
+   > **Important:** Use the App Runner URL from Step 1 as `VITE_API_BASE_URL`
 
-After deploy, copy App Runner service URL and set it as `VITE_API_BASE_URL` in Amplify.
+5. **Save and deploy**
+
+6. **Copy the Amplify URL** (looks like: `https://main.xxxxx.amplifyapp.com`)
+
+---
+
+### Step 3: Connect Frontend ↔ Backend
+
+**Update CORS in Backend:**
+
+1. Go back to **App Runner** → Your service → **Configuration** → **Environment Variables**
+2. Update `CORS_ORIGINS` to your Amplify URL:
+   ```
+   CORS_ORIGINS=https://main.xxxxx.amplifyapp.com
+   ```
+3. **Redeploy** the App Runner service
+
+**Verify Connection:**
+
+1. Open your Amplify URL in the browser
+2. Create a new session and send a test message
+3. Check browser DevTools → Network tab → API calls should hit your App Runner URL
+4. Check App Runner logs for incoming requests
+
+---
+
+### Troubleshooting
+
+| Issue | Solution |
+|---|---|
+| CORS errors | Ensure `CORS_ORIGINS` in App Runner matches exact Amplify URL (no trailing slash) |
+| API 404 errors | Verify `VITE_API_BASE_URL` doesn't have `/api` suffix (frontend adds it) |
+| Builds fail | Check environment variable names match exactly (prefixes: `VITE_` for frontend) |
+| Backend crashes | Review App Runner logs → Configuration → Logs for Python errors |
 
 ---
 

@@ -71,11 +71,11 @@ export async function getSession(sessionId) {
     return res.json();
 }
 
-export async function panicWipe(sessionId) {
+export async function panicWipe(sessionId, userId) {
     const res = await fetch(`${API_BASE}/panic`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ session_id: sessionId }),
+        body: JSON.stringify({ session_id: sessionId, user_id: userId }),
     });
     return res.ok;
 }

@@ -147,6 +147,7 @@ class SessionResponse(BaseModel):
 
 class PanicRequest(BaseModel):
     session_id: str
+    user_id: str
 
 
 class SessionListRequest(BaseModel):
@@ -156,6 +157,31 @@ class SessionListRequest(BaseModel):
 class LoadSessionRequest(BaseModel):
     session_id: str
     user_id: str
+
+
+async def _assert_session_owner(session_id: str, user_id: str) -> None:
+    """Ensure the caller owns the session before exposing or mutating data."""
+    if not user_id:
+        raise HTTPException(status_code=401, detail="user_id is required")
+
+    # First trust active in-memory owner binding
+    if session_id in sessions:
+        sess = sessions[session_id]
+        state = sess["state"]
+
+        # Bind owner lazily if session was created without user_id
+        if not state.user_phone:
+            state.user_phone = user_id
+            return
+
+        if state.user_phone != user_id:
+            raise HTTPException(status_code=403, detail="Access denied for this session")
+        return
+
+    # Fallback to persisted chat ownership check for restored sessions
+    owns_session = await chat_storage.is_session_owned_by_user(session_id, user_id)
+    if not owns_session:
+        raise HTTPException(status_code=403, detail="Access denied for this session")
 
 
 # ---------------------------------------------------------------------------
@@ -423,9 +449,10 @@ async def download_draft(session_id: str, filename: str):
 
 @app.get("/api/chat-history/{session_id}")
 @limiter.limit("10/minute")
-async def get_chat_history(request: Request, session_id: str, limit: int = 50):
+async def get_chat_history(request: Request, session_id: str, user_id: str, limit: int = 50):
     """Retrieve chat history from DynamoDB for a session."""
     try:
+        await _assert_session_owner(session_id, user_id)
         messages = await chat_storage.get_session_history(session_id, limit=limit)
         return {
             "success": True,
@@ -458,6 +485,8 @@ async def list_user_sessions(request: Request, req: SessionListRequest):
 async def load_session(request: Request, req: LoadSessionRequest):
     """Load an existing session with its chat history."""
     try:
+        await _assert_session_owner(req.session_id, req.user_id)
+
         # Get chat history
         messages = await chat_storage.get_session_history(req.session_id, limit=100)
         
@@ -484,6 +513,8 @@ async def load_session(request: Request, req: LoadSessionRequest):
 @limiter.limit("1/minute")
 async def panic_wipe(request: Request, req: PanicRequest):
     """Emergency session wipe — delete all data for this session."""
+    await _assert_session_owner(req.session_id, req.user_id)
+
     if req.session_id in sessions:
         sess = sessions.pop(req.session_id)
 

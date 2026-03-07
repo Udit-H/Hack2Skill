@@ -214,6 +214,34 @@ class ChatStorageService:
         except Exception as e:
             logging.error(f"❌ Unexpected error listing sessions: {str(e)}")
             return []
+
+    async def is_session_owned_by_user(self, session_id: str, user_id: str) -> bool:
+        """
+        Verify whether a persisted session belongs to the given user.
+
+        Returns:
+            True if ownership can be confirmed, else False.
+        """
+        try:
+            response = self.table.query(
+                KeyConditionExpression=boto3.dynamodb.conditions.Key('session_id').eq(session_id),
+                Limit=50,
+                ScanIndexForward=False,
+            )
+
+            items = response.get('Items', [])
+            for item in items:
+                owner = item.get('user_id')
+                if owner:
+                    return owner == user_id
+
+            return False
+        except ClientError as e:
+            logging.error(f"❌ DynamoDB ownership check error: {e.response['Error']['Message']}")
+            return False
+        except Exception as e:
+            logging.error(f"❌ Unexpected ownership check error: {str(e)}")
+            return False
     
     def create_table_if_not_exists(self):
         """

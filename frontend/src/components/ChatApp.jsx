@@ -40,13 +40,13 @@ export default function ChatApp() {
   const handlePanic = useCallback(async () => {
     if (sessionId) {
       try {
-        await panicWipe(sessionId);
+        await panicWipe(sessionId, userId);
       } catch {
         // Silently fail — we're leaving anyway
       }
     }
     clearMessages();
-  }, [sessionId, clearMessages]);
+  }, [sessionId, userId, clearMessages]);
 
   const handleQuickAction = useCallback(
     (text) => {

@@ -11,4 +11,5 @@ cohere
 chromadb
 beautifulsoup4
 fastapi
+uvicorn[standard]
 aiofiles

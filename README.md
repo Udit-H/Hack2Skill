@@ -129,6 +129,56 @@ Open **http://localhost:5173** in your browser.
 
 ---
 
+## ☁️ AWS Deployment (Amplify + Backend API)
+
+### Frontend on AWS Amplify
+
+This repo is now configured with [amplify.yml](amplify.yml) for Amplify Hosting.
+
+In Amplify Console:
+
+1. Connect this GitHub repository.
+2. Select branch (for example: `main`).
+3. Add environment variables:
+  - `VITE_COGNITO_USER_POOL_ID`
+  - `VITE_COGNITO_CLIENT_ID`
+  - `VITE_COGNITO_REGION`
+  - `VITE_API_BASE_URL` (your backend base URL, e.g. `https://api.example.com`)
+4. Deploy.
+
+### Backend hosting note
+
+AWS Amplify Hosting deploys the React frontend, but this backend is a long-running FastAPI service and should be deployed separately (for example on **App Runner**, **ECS Fargate**, or **EC2**).
+
+Once backend is live, set `VITE_API_BASE_URL` in Amplify so frontend calls:
+
+`https://your-backend-domain/api/...`
+
+### Backend on AWS App Runner (No Docker)
+
+This repo includes [apprunner.yaml](apprunner.yaml) so App Runner can build from source code directly.
+
+In AWS App Runner:
+
+1. Create service → **Source code repository**.
+2. Connect this GitHub repo and branch.
+3. Configuration file: use **Repository configuration file** (`apprunner.yaml`).
+4. Build/Run are automatically picked up from config:
+  - Install: `pip install -r backend/requirements.txt`
+  - Start: `uvicorn --app-dir backend main:app --host 0.0.0.0 --port 8080`
+5. Add runtime environment variables (App Runner console):
+  - `AWS_ACCESS_KEY_ID`
+  - `AWS_SECRET_ACCESS_KEY`
+  - `AWS_REGION`
+  - `S3_BUCKET_NAME`
+  - `REDIS_HOST`, `REDIS_PORT`, `REDIS_PASSWORD`, `REDIS_DB_NAME`
+  - `GROQ_API_KEY` and/or Bedrock/Gemini variables you use
+  - `CORS_ORIGINS` (include your Amplify domain)
+
+After deploy, copy App Runner service URL and set it as `VITE_API_BASE_URL` in Amplify.
+
+---
+
 ## 📡 API Endpoints
 
 | Method | Endpoint | Description |

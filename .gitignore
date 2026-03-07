@@ -1,7 +1,26 @@
+# Environment files
 .env
-**/__pycache__
-# redis_test.py
-# supabase_test.py
-.gitignore
-.vscode
+.env.local
+.env.*
+backend/.env
+frontend/.env.local
+
+# Python cache / virtualenv
+**/__pycache__/
+*.py[cod]
+.venv/
+venv/
+
+# Node / frontend cache
+node_modules/
+frontend/node_modules/
+frontend/.vite/
+
+# IDE and OS
+.vscode/
+.idea/
+.DS_Store
+Thumbs.db
+
+# Local scratch files
 shelter_agent_archive.py

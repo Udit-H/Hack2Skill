@@ -1,4 +1,7 @@
-const API_BASE = '/api';
+const configuredBase = import.meta.env.VITE_API_BASE_URL?.trim();
+const API_BASE = configuredBase
+    ? `${configuredBase.replace(/\/$/, '')}/api`
+    : '/api';
 
 export async function createSession(userId = null) {
     const options = { method: 'POST' };

@@ -1,0 +1,21 @@
+version: 1.0
+runtime: python3
+
+build:
+  commands:
+    pre-build:
+      - python -m pip install --upgrade pip
+    build:
+      - pip install -r backend/requirements.txt
+
+run:
+  runtime-version: 3.11
+  command: uvicorn --app-dir backend main:app --host 0.0.0.0 --port 8080
+  network:
+    port: 8080
+    env: PORT
+  env:
+    - name: PYTHONUNBUFFERED
+      value: "1"
+    - name: AWS_REGION
+      value: "us-east-1"

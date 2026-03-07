@@ -6,6 +6,30 @@ from typing import List, Optional
 
 load_dotenv()
 
+
+def _clean_env_str(name: str, default: str = "") -> str:
+    value = os.getenv(name)
+    if value is None:
+        return default
+    return value.strip().strip('"').strip("'")
+
+
+def _clean_env_int(name: str, default: int) -> int:
+    value = _clean_env_str(name, "")
+    if not value:
+        return default
+    try:
+        return int(value)
+    except ValueError:
+        return default
+
+
+def _clean_env_bool(name: str, default: bool = False) -> bool:
+    value = _clean_env_str(name, "")
+    if not value:
+        return default
+    return value.lower() in {"1", "true", "yes", "on"}
+
 class DocumentIntelligenceSettings(BaseSettings):
     api_key: Optional[str] = os.getenv("DOCUMENT_INTELLIGENCE_API_KEY", "")
     endpoint: Optional[str] = os.getenv("DOCUMENT_INTELLIGENCE_ENDPOINT", "")
@@ -21,10 +45,13 @@ class LLMSettings(BaseSettings):
     groq_model_id: str = os.getenv("GROQ_MODEL_ID", "llama-3.3-70b-versatile")
 
 class RedisDbSettings(BaseSettings):
-    host: Optional[str] = os.getenv("REDIS_HOST", "localhost")
-    password: Optional[str] = os.getenv("REDIS_PASSWORD", "")
-    db_name: Optional[str] = os.getenv("REDIS_DB_NAME", "0")
-    port: Optional[int] = os.getenv("REDIS_PORT", 14324)
+    url: Optional[str] = _clean_env_str("REDIS_URL", "")
+    host: Optional[str] = _clean_env_str("REDIS_HOST", "localhost")
+    password: Optional[str] = _clean_env_str("REDIS_PASSWORD", "")
+    db_name: Optional[str] = _clean_env_str("REDIS_DB_NAME", "0")
+    port: Optional[int] = _clean_env_int("REDIS_PORT", 6379)
+    username: Optional[str] = _clean_env_str("REDIS_USERNAME", "default")
+    ssl: bool = _clean_env_bool("REDIS_SSL", False)
 
 class SupabaseDbSettings(BaseSettings):
     url: Optional[str] = os.getenv("SUPABASE_URL", "")

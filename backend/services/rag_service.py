@@ -1,9 +1,15 @@
 import logging
 import re
+import os
+import hashlib
+import json
+import time
 from typing import List, Dict, Any, Optional
 from pydantic import BaseModel, Field
 import cohere
 import chromadb
+import boto3
+from botocore.exceptions import ClientError
 from urllib.parse import urlparse
 
 from config.config import Settings
@@ -12,6 +18,19 @@ from utils.chunker import TableAwareChunker
 from services.ocr_service import DocumentIntelligenceService
 
 logging.basicConfig(level=logging.INFO)
+
+# ============== RAG Retrieval Cache ==============
+# Caches the expensive retrieval pipeline (embed → search → rerank)
+# in DynamoDB so repeated/similar legal queries skip Cohere + ChromaDB entirely.
+# The final answer is still generated fresh per-user by the LLM.
+
+RAG_CACHE_TTL = int(os.getenv("RAG_CACHE_TTL", 86400))  # 24 hours default
+
+
+def _rag_cache_key(query: str) -> str:
+    """Normalize query and produce a stable hash for cache lookup."""
+    normalized = re.sub(r"\s+", " ", query.lower().strip())
+    return hashlib.sha256(normalized.encode()).hexdigest()[:32]
 
 
 # ============== Pydantic Models ==============
@@ -49,7 +68,7 @@ class RAGResponse(BaseModel):
 # ============== RAG Service ==============
 
 class RAGService:
-    """Simple RAG pipeline service."""
+    """Simple RAG pipeline service with DynamoDB retrieval caching."""
     
     def __init__(self):
         settings = Settings()
@@ -74,6 +93,63 @@ class RAGService:
         # Document Intelligence & Chunker
         self.doc_intel_client = DocumentIntelligenceService()
         self.chunker = TableAwareChunker(child_chunk_size=512)
+
+        # ── RAG Retrieval Cache (DynamoDB) ──
+        self._cache_table = None
+        try:
+            cache_table_name = os.getenv("RAG_CACHE_TABLE", "sahayak-rag-cache")
+            dynamodb = boto3.resource(
+                "dynamodb",
+                region_name=settings.llm.aws_region,
+                aws_access_key_id=settings.llm.aws_access_key_id,
+                aws_secret_access_key=settings.llm.aws_secret_access_key,
+            )
+            self._cache_table = dynamodb.Table(cache_table_name)
+            # Quick validation — will fail silently if table doesn't exist
+            self._cache_table.table_status
+            logging.info(f"✅ RAG cache enabled (table: {cache_table_name})")
+        except Exception as e:
+            self._cache_table = None
+            logging.warning(f"⚠️  RAG cache disabled — DynamoDB table not available: {e}")
+
+    # ============== RAG Cache Helpers ==============
+
+    def _cache_get(self, query: str) -> Optional[List[Dict]]:
+        """Look up cached retrieval results for a query. Returns None on miss."""
+        if not self._cache_table:
+            return None
+        try:
+            key = _rag_cache_key(query)
+            resp = self._cache_table.get_item(Key={"query_hash": key})
+            item = resp.get("Item")
+            if not item:
+                return None
+            # Check TTL
+            if item.get("expires_at", 0) < int(time.time()):
+                logging.info(f"  🔄 RAG cache expired for query hash {key[:8]}...")
+                return None
+            logging.info(f"  💰 RAG cache HIT — skipping embed + search + rerank")
+            return json.loads(item["chunks_json"])
+        except Exception as e:
+            logging.warning(f"  ⚠️  RAG cache read error: {e}")
+            return None
+
+    def _cache_put(self, query: str, chunks: List[Dict]):
+        """Store retrieval results in the cache."""
+        if not self._cache_table:
+            return
+        try:
+            key = _rag_cache_key(query)
+            self._cache_table.put_item(Item={
+                "query_hash": key,
+                "query_text": query[:500],  # Store truncated query for debugging
+                "chunks_json": json.dumps(chunks),
+                "expires_at": int(time.time()) + RAG_CACHE_TTL,
+                "created_at": int(time.time()),
+            })
+            logging.info(f"  💾 RAG cache stored ({len(chunks)} chunks)")
+        except Exception as e:
+            logging.warning(f"  ⚠️  RAG cache write error: {e}")
 
     # ============== Data Ingestion ==============
 
@@ -338,19 +414,44 @@ Provide a clear, helpful answer based only on the given context."""
     
     def search(self, user_query: str) -> RAGResponse:
         """
-        Main search API: parses query, retrieves, and generates answer.
+        Main search API: parses query, retrieves (with caching), and generates answer.
+
+        Cost optimization:
+        - Steps 1-3 (parse → embed → search → rerank) are cached in DynamoDB.
+        - On cache hit, we skip Cohere embed, ChromaDB search, and Cohere rerank entirely.
+        - Step 4 (answer generation) always runs fresh so the answer is contextual.
         """
         try:
-            # Step 1: Parse query
+            # ── Check retrieval cache first ──
+            cached = self._cache_get(user_query)
+            if cached is not None:
+                # Cache HIT: reconstruct RetrievalResult objects from cached dicts
+                chunks = [RetrievalResult(**c) for c in cached]
+                # Generate fresh answer using cached retrieval
+                answer = self._generate_answer(user_query, chunks)
+                return RAGResponse(
+                    success=True,
+                    answer=answer,
+                    reasoning_questions=[],
+                    search_queries=["(cached)"],
+                    chunk_count=len(chunks),
+                )
+
+            # ── Cache MISS: full pipeline ──
+            # Step 1: Parse query (1 LLM call)
             reasoning_plan = self._parse_query(user_query)
             
-            # Step 2: Generate search queries
+            # Step 2: Generate search queries (1 LLM call)
             search_queries = self._generate_search_queries(reasoning_plan)
             
-            # Step 3: Retrieve and re-rank
+            # Step 3: Retrieve and re-rank (Cohere embed + ChromaDB + Cohere rerank)
             chunks = self._retrieve_and_rerank(search_queries)
+
+            # ── Store retrieval results in cache ──
+            if chunks:
+                self._cache_put(user_query, [c.model_dump() for c in chunks])
             
-            # Step 4: Generate answer
+            # Step 4: Generate answer (1 LLM call — always fresh)
             answer = self._generate_answer(user_query, chunks)
             
             return RAGResponse(

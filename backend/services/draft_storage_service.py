@@ -68,3 +68,12 @@ class DraftStorageService:
             return True
         except ClientError:
             return False
+
+    def download_draft_bytes(self, session_id: str, filename: str) -> bytes:
+        """Download draft content from S3 and return raw bytes."""
+        if not self.bucket_name:
+            raise RuntimeError("S3_BUCKET_NAME is not configured")
+
+        s3_key = self.build_s3_key(session_id, filename)
+        response = self.s3.get_object(Bucket=self.bucket_name, Key=s3_key)
+        return response["Body"].read()

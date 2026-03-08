@@ -1,6 +1,7 @@
-import { Fragment } from 'react';
+import { Fragment, useCallback } from 'react';
+import { downloadDraft } from '../utils/api';
 
-function renderMessageContent(content) {
+function renderMessageContent(content, onDownload) {
     const input = String(content ?? '');
     const linkRegex = /\[([^\]]+)\]\(([^)]+)\)/g;
     const nodes = [];
@@ -15,16 +16,32 @@ function renderMessageContent(content) {
             nodes.push(input.slice(lastIndex, start));
         }
 
+        // Draft download links go through fetch+blob, not navigation
+        const isDraftLink = linkHref.startsWith('/api/drafts/');
+
         nodes.push(
-            <a
-                key={`${linkHref}-${start}`}
-                href={linkHref}
-                download
-                target="_blank"
-                rel="noopener noreferrer"
-            >
-                {linkText}
-            </a>
+            isDraftLink ? (
+                <a
+                    key={`${linkHref}-${start}`}
+                    href={linkHref}
+                    onClick={(e) => {
+                        e.preventDefault();
+                        onDownload(linkHref);
+                    }}
+                    style={{ cursor: 'pointer' }}
+                >
+                    {linkText}
+                </a>
+            ) : (
+                <a
+                    key={`${linkHref}-${start}`}
+                    href={linkHref}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                >
+                    {linkText}
+                </a>
+            )
         );
 
         lastIndex = start + fullMatch.length;
@@ -53,6 +70,15 @@ export default function MessageBubble({ message }) {
         minute: '2-digit',
     });
 
+    const handleDownload = useCallback(async (href) => {
+        try {
+            await downloadDraft(href);
+        } catch (err) {
+            console.error('Download failed:', err);
+            alert('Failed to download document. Please try again.');
+        }
+    }, []);
+
     return (
         <div className={`message ${isUser ? 'user' : 'assistant'}`}>
             <div className="message-avatar">
@@ -60,7 +86,7 @@ export default function MessageBubble({ message }) {
             </div>
             <div>
                 <div className="message-bubble">
-                    {renderMessageContent(message.content)}
+                    {renderMessageContent(message.content, handleDownload)}
                 </div>
                 <div className="message-time">{time}</div>
             </div>

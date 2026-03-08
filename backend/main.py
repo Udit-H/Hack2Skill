@@ -13,7 +13,7 @@ from contextlib import asynccontextmanager
 
 from fastapi import FastAPI, UploadFile, File, Form, HTTPException, Request
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import FileResponse, JSONResponse, RedirectResponse
+from fastapi.responses import FileResponse, JSONResponse, RedirectResponse, Response
 from pydantic import BaseModel
 from typing import Optional
 from slowapi import Limiter
@@ -417,18 +417,24 @@ async def upload_document(
 
 @app.get("/api/drafts/{session_id}/{filename}")
 async def download_draft(session_id: str, filename: str):
-    """Download a generated PDF draft from S3 (with local fallback)."""
-    # Prefer S3 storage: generate a fresh presigned URL each request
+    """Download a generated PDF draft — streams content directly (no redirect)."""
+    # Prefer S3 storage: download bytes and stream back to client
     try:
         if draft_storage.object_exists(session_id, filename):
-            presigned_url = draft_storage.generate_presigned_download_url(session_id, filename)
-            return RedirectResponse(url=presigned_url, status_code=307)
+            content = draft_storage.download_draft_bytes(session_id, filename)
+            return Response(
+                content=content,
+                media_type="application/pdf",
+                headers={
+                    "Content-Disposition": f'attachment; filename="{filename}"',
+                },
+            )
     except Exception as e:
-        print(f"⚠️  S3 draft lookup failed for {session_id}/{filename}: {e}")
+        print(f"⚠️  S3 draft download failed for {session_id}/{filename}: {e}")
 
     # Backward-compatible fallback to local temp file
     draft_path = os.path.join(tempfile.gettempdir(), "sahayak_drafts", session_id, filename)
-    
+
     if not os.path.exists(draft_path):
         raise HTTPException(status_code=404, detail="Draft not found")
 

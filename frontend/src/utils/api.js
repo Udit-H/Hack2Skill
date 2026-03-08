@@ -79,3 +79,34 @@ export async function panicWipe(sessionId, userId) {
     });
     return res.ok;
 }
+
+/**
+ * Download a draft PDF via fetch → blob → save-as dialog.
+ * Resolves relative /api/ paths against the correct backend base URL.
+ * @param {string} href - The link href, e.g. "/api/drafts/session/file.pdf"
+ */
+export async function downloadDraft(href) {
+    // Resolve relative /api/ path against the configured backend base
+    const url = href.startsWith('/api')
+        ? `${API_BASE}${href.replace(/^\/api/, '')}`
+        : href;
+
+    const res = await fetch(url);
+    if (!res.ok) throw new Error(`Download failed (${res.status})`);
+
+    const blob = await res.blob();
+    const filename = href.split('/').pop() || 'document.pdf';
+
+    // Create a temporary <a> to trigger browser save-as
+    const anchor = document.createElement('a');
+    anchor.href = URL.createObjectURL(blob);
+    anchor.download = filename;
+    document.body.appendChild(anchor);
+    anchor.click();
+
+    // Cleanup
+    setTimeout(() => {
+        URL.revokeObjectURL(anchor.href);
+        document.body.removeChild(anchor);
+    }, 100);
+}

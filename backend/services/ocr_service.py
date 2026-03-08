@@ -120,8 +120,14 @@ class DocumentIntelligenceService:
         if not suffix and isinstance(source, bytes):
             suffix = self._infer_suffix_from_bytes(source)
 
+        logger.info(f"📄 OCR analyze(): suffix={suffix}, is_url={is_url}, is_s3_key={is_s3_key}, "
+                     f"source_type={type(source).__name__}, "
+                     f"source_size={len(source) if isinstance(source, bytes) else 'file'}")
+
         if suffix in self.ASYNC_REQUIRED_TYPES or is_s3_key:
+            logger.info(f"📄 Using ASYNC Textract path (PDF/S3)")
             return await self._analyze_async(source, is_s3_key=is_s3_key)
+        logger.info(f"📄 Using SYNC Textract path (image)")
         return await self._analyze_sync(source)
 
 
@@ -145,16 +151,30 @@ class DocumentIntelligenceService:
         Uses Textract's synchronous DetectDocumentText API.
         Suitable for single-page images. No S3 required.
         """
-        logger.info("Using synchronous Textract analysis (image input)")
+        logger.info("📄 SYNC Textract: resolving source to bytes...")
         file_bytes = await self._resolve_to_bytes(source)
+        logger.info(f"📄 SYNC Textract: sending {len(file_bytes)} bytes to DetectDocumentText")
 
         # Run blocking boto3 call in thread pool so we don't block the event loop
-        response = await asyncio.to_thread(
-            self.textract.detect_document_text,
-            Document={"Bytes": file_bytes}
-        )
-
-        return self._parse_response(response.get("Blocks", []))
+        try:
+            response = await asyncio.to_thread(
+                self.textract.detect_document_text,
+                Document={"Bytes": file_bytes}
+            )
+            blocks = response.get("Blocks", [])
+            logger.info(f"📄 SYNC Textract: received {len(blocks)} blocks")
+            result = self._parse_response(blocks)
+            logger.info(f"📄 SYNC Textract: parsed → status={result['status']}, "
+                         f"pages={result['page_count']}, text_len={len(result['content'])}")
+            return result
+        except ClientError as e:
+            error_code = e.response.get("Error", {}).get("Code", "Unknown")
+            error_msg = e.response.get("Error", {}).get("Message", str(e))
+            logger.error(f"❌ SYNC Textract ClientError: code={error_code}, message={error_msg}")
+            raise
+        except Exception as e:
+            logger.error(f"❌ SYNC Textract unexpected error: {type(e).__name__}: {e}", exc_info=True)
+            raise
 
     # -------------------------------------------------------------------------
     # Async path — PDFs via S3
@@ -168,6 +188,7 @@ class DocumentIntelligenceService:
         Required for PDFs. File must be (or will be) in S3.
         """
         if not self.s3_bucket:
+            logger.error("❌ ASYNC Textract: S3_BUCKET_NAME not set — cannot process PDFs")
             raise ValueError(
                 "S3_BUCKET_NAME must be set for PDF analysis. "
                 "Pass s3_bucket= to the constructor or set the S3_BUCKET_NAME env var."
@@ -175,30 +196,39 @@ class DocumentIntelligenceService:
 
         if is_s3_key:
             s3_key = source
-            logger.info(f"Using existing S3 object: s3://{self.s3_bucket}/{s3_key}")
+            logger.info(f"📄 ASYNC Textract: using existing S3 object s3://{self.s3_bucket}/{s3_key}")
         else:
             s3_key = await self._upload_to_s3(source)
 
-        logger.info(f"Starting async Textract job for s3://{self.s3_bucket}/{s3_key}")
+        logger.info(f"📄 ASYNC Textract: starting job for s3://{self.s3_bucket}/{s3_key}")
 
         # Start the job
-        start_response = await asyncio.to_thread(
-            self.textract.start_document_text_detection,
-            DocumentLocation={
-                "S3Object": {
-                    "Bucket": self.s3_bucket,
-                    "Name": s3_key,
+        try:
+            start_response = await asyncio.to_thread(
+                self.textract.start_document_text_detection,
+                DocumentLocation={
+                    "S3Object": {
+                        "Bucket": self.s3_bucket,
+                        "Name": s3_key,
+                    }
                 }
-            }
-        )
+            )
+        except ClientError as e:
+            error_code = e.response.get("Error", {}).get("Code", "Unknown")
+            error_msg = e.response.get("Error", {}).get("Message", str(e))
+            logger.error(f"❌ ASYNC Textract start_job ClientError: code={error_code}, message={error_msg}")
+            raise
 
         job_id = start_response["JobId"]
-        logger.info(f"Textract job started: {job_id}")
+        logger.info(f"📄 ASYNC Textract: job started → job_id={job_id}")
 
         # Poll until complete
         blocks = await self._poll_job(job_id)
 
-        return self._parse_response(blocks)
+        result = self._parse_response(blocks)
+        logger.info(f"📄 ASYNC Textract: parsed → status={result['status']}, "
+                     f"pages={result['page_count']}, text_len={len(result['content'])}")
+        return result
 
     async def _poll_job(self, job_id: str, max_wait_seconds: int = 300) -> list:
         """

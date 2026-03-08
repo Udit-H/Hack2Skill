@@ -13,6 +13,8 @@ from services.ocr_service import DocumentIntelligenceService
 # Remove this line later
 from core.memory import MemoryManager
 
+logger = logging.getLogger(__name__)
+
 class LegalAgent:
     def __init__(self):
         self.llm = LLMService()
@@ -34,14 +36,26 @@ class LegalAgent:
         """
 
         # --- PHASE 1: DATA GATHERING (OCR & RAG) ---
-        if document_path and (not current_state.extracted_doc_data or current_state.extracted_doc_data.startswith("OCR failed")):
+        # OCR: Only run if we have a document_path AND don't already have extracted text
+        # (upload endpoint now does OCR first and stores on state)
+        if current_state.extracted_doc_data and not current_state.extracted_doc_data.startswith("OCR failed"):
+            logger.info(f"📄 Legal Agent: OCR text already present ({len(current_state.extracted_doc_data)} chars), skipping OCR")
+        elif document_path:
             try:
+                logger.info(f"📄 Legal Agent: Running OCR on {document_path}")
                 ocr_result = await self.ocr_service.analyze(source=document_path)
-                current_state.extracted_doc_data = ocr_result.get("content", "OCR returned no text.")
-                print(f"✅ OCR succeeded: {len(current_state.extracted_doc_data)} chars extracted")
+                extracted = ocr_result.get("content", "")
+                if extracted:
+                    current_state.extracted_doc_data = extracted
+                    logger.info(f"✅ Legal Agent OCR succeeded: {len(extracted)} chars extracted")
+                else:
+                    current_state.extracted_doc_data = "OCR returned no text."
+                    logger.warning(f"⚠️ Legal Agent OCR returned empty text for {document_path}")
             except Exception as e:
                 current_state.extracted_doc_data = f"OCR failed: {str(e)}"
-                print(f"❌ OCR failed: {e}")
+                logger.error(f"❌ Legal Agent OCR failed: {e}", exc_info=True)
+        else:
+            logger.info(f"📄 Legal Agent: No document_path and no existing OCR text")
 
         # RAG (synchronous — uses sync Cohere + ChromaDB clients)
         if not current_state.retrieved_legal_context:
@@ -93,11 +107,11 @@ class LegalAgent:
 
         system_prompt = await self.get_legal_system_prompt(triage, current_state, document_path)
 
-        print(f"\n📋 Legal Agent Input:")
-        print(f"   Current Status: {current_state.workflow_status}")
-        print(f"   Document Data: {'✅ Present' if current_state.extracted_doc_data else '❌ Missing'}")
-        print(f"   Has Consent: {current_state.user_consent_police if current_state.user_consent_police is not None else 'Not set'}")
-        print(f"   User Message: {user_message[:100] if user_message else 'None'}...")
+        logger.info(f"\n📋 Legal Agent Input:")
+        logger.info(f"   Current Status: {current_state.workflow_status}")
+        logger.info(f"   Document Data: {'✅ Present (' + str(len(current_state.extracted_doc_data)) + ' chars)' if current_state.extracted_doc_data else '❌ Missing'}")
+        logger.info(f"   Has Consent: {current_state.user_consent_police if current_state.user_consent_police is not None else 'Not set'}")
+        logger.info(f"   User Message: {user_message[:100] if user_message else 'None'}...")
 
         try:
             updated_state: LegalAgentState = await self.llm.create_structured(
@@ -109,14 +123,14 @@ class LegalAgent:
                 ]
             )
             
-            print(f"\n✅ Legal Agent Output:")
-            print(f"   New Status: {updated_state.workflow_status}")
-            print(f"   Next Question: {updated_state.next_question_for_user[:100] if updated_state.next_question_for_user else 'None'}...")
-            print(f"   Drafts to Generate: {len(updated_state.drafts_to_generate)}")
+            logger.info(f"\n✅ Legal Agent Output:")
+            logger.info(f"   New Status: {updated_state.workflow_status}")
+            logger.info(f"   Next Question: {updated_state.next_question_for_user[:100] if updated_state.next_question_for_user else 'None'}...")
+            logger.info(f"   Drafts to Generate: {len(updated_state.drafts_to_generate)}")
             
         except Exception as e:
-            print(f"⚠️ LLM API Error: {e}. Using mock response.")
-            print(f"   Keeping current state: {current_state.workflow_status}")
+            logger.error(f"⚠️ LLM API Error: {e}. Using mock response.", exc_info=True)
+            logger.info(f"   Keeping current state: {current_state.workflow_status}")
             # Fallback to mock response when API fails
             updated_state = current_state
 

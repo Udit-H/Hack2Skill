@@ -9,6 +9,7 @@ import uuid
 import os
 import tempfile
 import asyncio
+import logging
 from contextlib import asynccontextmanager
 
 from fastapi import FastAPI, UploadFile, File, Form, HTTPException, Request
@@ -23,10 +24,20 @@ from slowapi.middleware import SlowAPIMiddleware
 
 # Internal imports
 from models.session import SessionState, AgentType, AgentActionType
+from models.legal import LegalAgentState
 from core.memory import MemoryManager
 from core.orchestrator import Orchestrator
 from services.chat_storage_service import ChatStorageService
 from services.draft_storage_service import DraftStorageService
+from services.ocr_service import DocumentIntelligenceService
+
+logger = logging.getLogger(__name__)
+
+# Configure logging to show INFO level for our modules
+logging.basicConfig(
+    level=logging.INFO,
+    format="%(asctime)s [%(levelname)s] %(name)s: %(message)s",
+)
 
 # ---------------------------------------------------------------------------
 # Rate Limiter Configuration
@@ -373,31 +384,104 @@ async def upload_document(
     with open(file_path, "wb") as f:
         f.write(contents)
 
+    # -------------------------------------------------------------------------
+    # STEP 1: Run OCR HERE in the upload endpoint (before any agent)
+    # -------------------------------------------------------------------------
+    ocr_text = None
+    ocr_error = None
+    try:
+        logger.info(f"📄 OCR START: file={file.filename}, size={file_size} bytes, "
+                     f"ext={file_extension}, mime={file.content_type}, session={session_id}")
+        logger.info(f"📄 OCR INPUT: file_path={file_path}, exists={os.path.exists(file_path)}, "
+                     f"file_size_on_disk={os.path.getsize(file_path)} bytes")
+        
+        ocr_service = DocumentIntelligenceService()
+        ocr_result = await ocr_service.analyze(source=file_path)
+        
+        ocr_status = ocr_result.get("status", "unknown")
+        ocr_text = ocr_result.get("content", "")
+        page_count = ocr_result.get("page_count", 0)
+        confidence = ocr_result.get("confidence_avg", 0)
+        
+        logger.info(f"📄 OCR RESULT: status={ocr_status}, pages={page_count}, "
+                     f"confidence={confidence:.2f}, text_length={len(ocr_text)} chars")
+        
+        if ocr_text:
+            preview = ocr_text[:300].replace('\n', ' ')
+            logger.info(f"📄 OCR PREVIEW: {preview}...")
+        else:
+            logger.warning(f"⚠️ OCR returned EMPTY text for {file.filename} "
+                          f"(status={ocr_status}, pages={page_count})")
+            ocr_error = "Textract returned empty text"
+            
+    except Exception as e:
+        ocr_error = str(e)
+        logger.error(f"❌ OCR FAILED for {file.filename}: {type(e).__name__}: {e}", exc_info=True)
+        logger.error(f"❌ OCR DEBUG: region={os.environ.get('AWS_REGION', 'not set')}, "
+                     f"s3_bucket={os.environ.get('S3_BUCKET_NAME', 'not set')}, "
+                     f"aws_key_set={bool(os.environ.get('AWS_ACCESS_KEY_ID'))}")
+
+    # -------------------------------------------------------------------------
+    # STEP 2: Store extracted text on session state (so agents can use it)
+    # -------------------------------------------------------------------------
+    if ocr_text:
+        # Ensure legal state exists to store the OCR data
+        if not state.legal:
+            state.legal = LegalAgentState()
+        state.legal.extracted_doc_data = ocr_text
+        logger.info(f"✅ Stored OCR text on session.legal.extracted_doc_data ({len(ocr_text)} chars)")
+
+    # -------------------------------------------------------------------------
+    # STEP 3: Build the user message to send to the agent
+    # Include extracted text so the LLM MUST acknowledge it
+    # -------------------------------------------------------------------------
+    if ocr_text:
+        # Include first 2000 chars of extracted text in the user message
+        # so the active agent (even triage) sees the document content
+        text_preview = ocr_text[:2000]
+        user_message = (
+            f"I am uploading my document: {file.filename}\n\n"
+            f"--- EXTRACTED DOCUMENT TEXT ---\n{text_preview}\n--- END OF EXTRACTED TEXT ---\n\n"
+            f"Please summarize what this document says and tell me what information you still need."
+        )
+    elif ocr_error:
+        user_message = (
+            f"I am uploading my document: {file.filename}\n\n"
+            f"Note: Document text extraction encountered an issue: {ocr_error}. "
+            f"Please ask me to describe the document contents."
+        )
+    else:
+        user_message = f"I am uploading my document: {file.filename}"
+
     try:
         # Route through orchestrator with document
         reply = await orchestrator.handle_turn(
             session=state,
             memory_manager=memory,
-            user_message=f"I am uploading my document: {file.filename}",
+            user_message=user_message,
             document_path=file_path,
         )
 
-        # Log OCR result
-        ocr_text = state.legal.extracted_doc_data if state.legal else None
-        if ocr_text:
-            preview = ocr_text[:500]
-            print(f"\n📄 OCR RESULT for {file.filename}:")
-            print(f"   Length: {len(ocr_text)} chars")
-            print(f"   Preview: {preview}...\n")
+        logger.info(f"📄 AGENT REPLY (first 200 chars): {reply[:200] if reply else 'None'}...")
 
-            # If the agent reply doesn't mention the document content,
-            # prepend a brief extraction notice so the user knows it worked.
-            doc_keywords = ["document", "agreement", "extracted", "uploaded", "can see", "rental", "contract"]
+        # If OCR succeeded but agent reply doesn't mention document content,
+        # prepend extraction summary so user knows it worked
+        if ocr_text:
+            doc_keywords = ["document", "agreement", "extracted", "uploaded", "can see",
+                            "rental", "contract", "notice", "i've read", "i can see",
+                            "this appears", "this is a", "the document"]
             if not any(kw in reply.lower() for kw in doc_keywords):
                 reply = (
                     f"📄 I've successfully extracted text from **{file.filename}** "
                     f"({len(ocr_text):,} characters). I'm now analyzing the contents.\n\n{reply}"
                 )
+
+        # If OCR failed entirely, warn the user
+        if ocr_error and "extraction" not in reply.lower():
+            reply = (
+                f"⚠️ I had trouble reading **{file.filename}** automatically "
+                f"(Error: {ocr_error}). Could you briefly describe what the document says?\n\n{reply}"
+            )
 
         memory.add_turn(
             user_message=f"Uploaded document: {file.filename}",
@@ -409,6 +493,7 @@ async def upload_document(
             "filename": file.filename,
             "ocr_preview": (ocr_text[:300] + "...") if ocr_text and len(ocr_text) > 300 else ocr_text,
             "ocr_length": len(ocr_text) if ocr_text else 0,
+            "ocr_error": ocr_error,
             "agent_info": {
                 "activeAgent": state.active_agent.value,
                 "workflowStatus": _get_workflow_status(state),
@@ -416,7 +501,7 @@ async def upload_document(
         }
 
     except Exception as e:
-        print(f"❌ Upload error: {e}")
+        logger.error(f"❌ Upload processing error: {e}", exc_info=True)
         raise HTTPException(status_code=500, detail=f"Upload processing error: {str(e)}")
     finally:
         # Clean up temp file

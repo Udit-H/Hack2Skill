@@ -1,12 +1,91 @@
-import { useState, useRef, useEffect } from 'react';
+import { useState, useRef, useEffect, useCallback } from 'react';
 
-export default function InputBar({ onSend, onUpload, isLoading }) {
+// Map app language codes to Web Speech API BCP 47 tags
+const SPEECH_LANG_MAP = {
+    en: 'en-IN',
+    hi: 'hi-IN',
+    ta: 'ta-IN',
+    bn: 'bn-IN',
+};
+
+export default function InputBar({ onSend, onUpload, isLoading, language = 'en' }) {
     const [text, setText] = useState('');
     const [selectedFile, setSelectedFile] = useState(null);
     const [validationError, setValidationError] = useState(null);
+    const [isListening, setIsListening] = useState(false);
     const fileRef = useRef(null);
     const textareaRef = useRef(null);
     const prevIsLoading = useRef(isLoading);
+    const recognitionRef = useRef(null);
+
+    // Check browser support for Web Speech API
+    const speechSupported = typeof window !== 'undefined' &&
+        ('SpeechRecognition' in window || 'webkitSpeechRecognition' in window);
+
+    // Initialize speech recognition once
+    useEffect(() => {
+        if (!speechSupported) return;
+
+        const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+        const recognition = new SpeechRecognition();
+        recognition.continuous = true;
+        recognition.interimResults = true;
+        recognition.lang = SPEECH_LANG_MAP[language] || 'en-IN';
+
+        recognition.onresult = (event) => {
+            let finalTranscript = '';
+            let interimTranscript = '';
+            for (let i = event.resultIndex; i < event.results.length; i++) {
+                const transcript = event.results[i][0].transcript;
+                if (event.results[i].isFinal) {
+                    finalTranscript += transcript;
+                } else {
+                    interimTranscript += transcript;
+                }
+            }
+            if (finalTranscript) {
+                setText(prev => prev + finalTranscript);
+            }
+        };
+
+        recognition.onerror = (event) => {
+            console.error('Speech recognition error:', event.error);
+            setIsListening(false);
+        };
+
+        recognition.onend = () => {
+            setIsListening(false);
+        };
+
+        recognitionRef.current = recognition;
+
+        return () => {
+            recognition.abort();
+        };
+    }, [speechSupported]);
+
+    // Update recognition language when app language changes
+    useEffect(() => {
+        if (recognitionRef.current) {
+            recognitionRef.current.lang = SPEECH_LANG_MAP[language] || 'en-IN';
+        }
+    }, [language]);
+
+    const toggleListening = useCallback(() => {
+        if (!recognitionRef.current) return;
+
+        if (isListening) {
+            recognitionRef.current.stop();
+            setIsListening(false);
+        } else {
+            try {
+                recognitionRef.current.start();
+                setIsListening(true);
+            } catch {
+                // Already started — ignore
+            }
+        }
+    }, [isListening]);
 
     // Auto-focus on mount and when loading finishes
     useEffect(() => {
@@ -57,6 +136,11 @@ export default function InputBar({ onSend, onUpload, isLoading }) {
     };
 
     const handleSend = () => {
+        // Stop voice input when sending
+        if (isListening && recognitionRef.current) {
+            recognitionRef.current.stop();
+            setIsListening(false);
+        }
         if (selectedFile) {
             onUpload(selectedFile);
             setSelectedFile(null);
@@ -183,6 +267,16 @@ export default function InputBar({ onSend, onUpload, isLoading }) {
                     >
                         📎
                     </button>
+                    {speechSupported && (
+                        <button
+                            className={`input-action-btn mic${isListening ? ' listening' : ''}`}
+                            onClick={toggleListening}
+                            title={isListening ? 'Stop listening' : 'Voice input'}
+                            aria-label={isListening ? 'Stop listening' : 'Voice input'}
+                        >
+                            🎙️
+                        </button>
+                    )}
                     <button
                         className="input-action-btn send"
                         onClick={handleSend}

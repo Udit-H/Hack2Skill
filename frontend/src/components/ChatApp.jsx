@@ -138,6 +138,7 @@ export default function ChatApp() {
           onSend={send}
           onUpload={upload}
           isLoading={isLoading || !sessionId}
+          language={language}
         />
       </main>
 

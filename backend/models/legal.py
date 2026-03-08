@@ -35,6 +35,8 @@ class WorkflowStatus(str, Enum):
 class LegalDraftPayload(BaseModel):
     draft_type: DraftType
     applicant_name: str
+    applicant_age: Optional[int] = Field(None, description="Age of the applicant")
+    applicant_phone: Optional[str] = Field(None, description="Contact phone number of the applicant")
     opponent_name: Optional[str] = None
     property_address: Optional[str] = None
     

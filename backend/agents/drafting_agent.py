@@ -238,23 +238,17 @@ class DraftingAgent:
 
         self._write_pdf(html_content, output_path)
 
-        # Push generated file to S3 and get presigned download URL
-        download_url = f"/api/drafts/{session.session_id}/{filename}"
+        # Push generated file to S3 (best-effort; local file remains fallback)
         try:
             self.draft_storage.upload_draft(output_path, session.session_id, filename)
-            # Use direct S3 presigned URL — works on Amplify without backend proxy
-            download_url = self.draft_storage.generate_presigned_download_url(
-                session.session_id, filename, expires_in=21600  # 6 hours
-            )
-            logging.info(f"S3 presigned URL generated for {filename}")
         except Exception as exc:
-            logging.warning(f"S3 upload/presign failed for {filename}: {exc} — using local fallback")
+            logging.warning(f"S3 upload failed for {filename}: {exc}")
 
         return GeneratedDraft(
             draft_type=payload.draft_type.value,
             title=DRAFT_TITLES.get(payload.draft_type, payload.draft_type.value),
             filename=filename,
-            download_url=download_url,
+            download_url=f"/api/drafts/{session.session_id}/{filename}",
         )
 
     async def _render_shelter_referral(self, session: SessionState) -> GeneratedDraft:
@@ -268,7 +262,8 @@ class DraftingAgent:
         context = {
             "date_of_draft": datetime.now().strftime("%d/%m/%Y"),
             "applicant_name": session.triage.victim_name if session.triage else "Applicant",
-            "applicant_phone": "",
+            "applicant_age": session.triage.victim_age if session.triage else "",
+            "applicant_phone": session.triage.victim_phone if session.triage else "",
             "shelter_name": selected.name,
             "shelter_address": selected.address,
             "crisis_category": session.triage.category.value if session.triage and session.triage.category else "",
@@ -286,22 +281,17 @@ class DraftingAgent:
 
         self._write_pdf(html_content, output_path)
 
-        # Push generated file to S3 and get presigned download URL
-        download_url = f"/api/drafts/{session.session_id}/{filename}"
+        # Push generated file to S3 (best-effort; local file remains fallback)
         try:
             self.draft_storage.upload_draft(output_path, session.session_id, filename)
-            download_url = self.draft_storage.generate_presigned_download_url(
-                session.session_id, filename, expires_in=21600  # 6 hours
-            )
-            logging.info(f"S3 presigned URL generated for {filename}")
         except Exception as exc:
-            logging.warning(f"S3 upload/presign failed for {filename}: {exc} — using local fallback")
+            logging.warning(f"S3 upload failed for {filename}: {exc}")
 
         return GeneratedDraft(
             draft_type=DraftType.SHELTER_REFERRAL.value,
             title=DRAFT_TITLES[DraftType.SHELTER_REFERRAL],
             filename=filename,
-            download_url=download_url,
+            download_url=f"/api/drafts/{session.session_id}/{filename}",
         )
 
     # ---------------------------------------------------------------
@@ -360,6 +350,8 @@ class DraftingAgent:
         context = {
             # From payload
             "applicant_name": payload.applicant_name,
+            "applicant_age": payload.applicant_age or (session.triage.victim_age if session.triage else ""),
+            "applicant_phone": payload.applicant_phone or (session.triage.victim_phone if session.triage else ""),
             "opponent_name": payload.opponent_name or "",
             "property_address": payload.property_address or "",
             "draft_body_summary": payload.draft_body_summary or "",
@@ -393,7 +385,6 @@ class DraftingAgent:
         # Police-specific fields (for police_initimation template)
         if payload.draft_type == DraftType.POLICE_INTIMATION:
             context["police_station_name"] = "Local"
-            context["applicant_phone"] = ""
 
         return context
 

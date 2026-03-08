@@ -23,6 +23,8 @@ class TriageState(BaseModel):
     incident_summary: Optional[str] = Field(None, description="A 2-sentence summary of who the user is and what happened.")
     
     victim_name: Optional[str] = Field(None, description="Name of the person in distress")
+    victim_age: Optional[int] = Field(None, description="Age of the person in distress")
+    victim_phone: Optional[str] = Field(None, description="Contact phone number of the person in distress")
     aggressor_name: Optional[str] = Field(None, description="Name of landlord, abusive spouse, or abusive child. Leave Null for Natural Disasters.")
     property_address: Optional[str] = Field(None, description="Address of the disputed or unsafe property.")
 

@@ -16,9 +16,8 @@ function renderMessageContent(content, onDownload) {
             nodes.push(input.slice(lastIndex, start));
         }
 
-        // Draft download links: S3 presigned URLs or relative /api/drafts/ paths
-        const isDraftLink = linkHref.startsWith('/api/drafts/') ||
-            (linkHref.includes('/drafts/') && linkHref.endsWith('.pdf'));
+        // Draft download links go through fetch+blob, not navigation
+        const isDraftLink = linkHref.startsWith('/api/drafts/');
 
         nodes.push(
             isDraftLink ? (

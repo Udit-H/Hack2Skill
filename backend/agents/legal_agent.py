@@ -130,6 +130,8 @@ class LegalAgent:
             
             base_payload = dict(
                 applicant_name=triage.victim_name or "Applicant",
+                applicant_age=triage.victim_age,
+                applicant_phone=triage.victim_phone or "",
                 opponent_name=triage.aggressor_name,
                 property_address=triage.property_address,
                 monthly_income=0,

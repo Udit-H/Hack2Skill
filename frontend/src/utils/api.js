@@ -86,36 +86,16 @@ export async function panicWipe(sessionId, userId) {
  * @param {string} href - The link href, e.g. "/api/drafts/session/file.pdf"
  */
 export async function downloadDraft(href) {
-    // Absolute URLs (S3 presigned) use directly; relative /api/ paths resolve via API_BASE
-    let url;
-    if (href.startsWith('http://') || href.startsWith('https://')) {
-        url = href;  // S3 presigned URL — use as-is
-    } else if (href.startsWith('/api')) {
-        url = `${API_BASE}${href.replace(/^\/api/, '')}`;
-    } else {
-        url = href;
-    }
+    // Resolve relative /api/ path against the configured backend base
+    const url = href.startsWith('/api')
+        ? `${API_BASE}${href.replace(/^\/api/, '')}`
+        : href;
 
     const res = await fetch(url);
     if (!res.ok) throw new Error(`Download failed (${res.status})`);
 
-    // Validate we actually got a PDF back, not an HTML error page / SPA shell
-    const contentType = res.headers.get('content-type') || '';
-    if (contentType.includes('text/html')) {
-        throw new Error(
-            'Server returned HTML instead of PDF. The backend API may be unreachable.'
-        );
-    }
-
-    // Force blob type to application/pdf regardless of server header
-    const raw = await res.arrayBuffer();
-    const blob = new Blob([raw], { type: 'application/pdf' });
-
-    // Ensure filename always ends in .pdf
-    let filename = href.split('/').pop() || 'document.pdf';
-    if (!filename.endsWith('.pdf')) {
-        filename = filename.replace(/\.[^.]+$/, '') + '.pdf';
-    }
+    const blob = await res.blob();
+    const filename = href.split('/').pop() || 'document.pdf';
 
     // Create a temporary <a> to trigger browser save-as
     const anchor = document.createElement('a');

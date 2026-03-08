@@ -390,6 +390,15 @@ async def upload_document(
             print(f"   Length: {len(ocr_text)} chars")
             print(f"   Preview: {preview}...\n")
 
+            # If the agent reply doesn't mention the document content,
+            # prepend a brief extraction notice so the user knows it worked.
+            doc_keywords = ["document", "agreement", "extracted", "uploaded", "can see", "rental", "contract"]
+            if not any(kw in reply.lower() for kw in doc_keywords):
+                reply = (
+                    f"📄 I've successfully extracted text from **{file.filename}** "
+                    f"({len(ocr_text):,} characters). I'm now analyzing the contents.\n\n{reply}"
+                )
+
         memory.add_turn(
             user_message=f"Uploaded document: {file.filename}",
             ai_message=reply,

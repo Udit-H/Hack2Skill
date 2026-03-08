@@ -30,6 +30,29 @@ def _clean_env_bool(name: str, default: bool = False) -> bool:
         return default
     return value.lower() in {"1", "true", "yes", "on"}
 
+
+def _parse_redis_host_port(default_host: str = "localhost", default_port: int = 6379) -> tuple[str, int]:
+    raw_host = _clean_env_str("REDIS_HOST", default_host)
+    raw_port = _clean_env_str("REDIS_PORT", "")
+
+    host = raw_host
+    parsed_port = default_port
+
+    # Support REDIS_HOST values like "redis.example.com:12908"
+    if raw_host and ":" in raw_host and not raw_host.startswith("redis://"):
+        host_parts = raw_host.rsplit(":", 1)
+        if len(host_parts) == 2 and host_parts[1].isdigit():
+            host = host_parts[0]
+            parsed_port = int(host_parts[1])
+
+    if raw_port:
+        try:
+            parsed_port = int(raw_port)
+        except ValueError:
+            pass
+
+    return host, parsed_port
+
 class DocumentIntelligenceSettings(BaseSettings):
     api_key: Optional[str] = os.getenv("DOCUMENT_INTELLIGENCE_API_KEY", "")
     endpoint: Optional[str] = os.getenv("DOCUMENT_INTELLIGENCE_ENDPOINT", "")
@@ -45,12 +68,14 @@ class LLMSettings(BaseSettings):
     groq_model_id: str = os.getenv("GROQ_MODEL_ID", "llama-3.3-70b-versatile")
 
 class RedisDbSettings(BaseSettings):
+    _parsed_host, _parsed_port = _parse_redis_host_port()
+
     url: Optional[str] = _clean_env_str("REDIS_URL", "")
-    host: Optional[str] = _clean_env_str("REDIS_HOST", "localhost")
+    host: Optional[str] = _parsed_host
     password: Optional[str] = _clean_env_str("REDIS_PASSWORD", "")
     db_name: Optional[str] = _clean_env_str("REDIS_DB_NAME", "0")
-    port: Optional[int] = _clean_env_int("REDIS_PORT", 6379)
-    username: Optional[str] = _clean_env_str("REDIS_USERNAME", "default")
+    port: Optional[int] = _parsed_port
+    username: Optional[str] = _clean_env_str("REDIS_USERNAME", "")
     ssl: bool = _clean_env_bool("REDIS_SSL", False)
 
 class SupabaseDbSettings(BaseSettings):

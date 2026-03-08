@@ -22,28 +22,14 @@ class MemoryManager:
     def __init__(self, session_id: str = None):
         settings = Settings()
         self.session_id = session_id
-
-        redis_db_index = 0
-        try:
-            redis_db_index = int(settings.redisdb.db_name or "0")
-        except (TypeError, ValueError):
-            redis_db_index = 0
-
-        if settings.redisdb.url:
-            self.redis_client = redis.from_url(
-                settings.redisdb.url,
-                decode_responses=True,
-            )
-        else:
-            self.redis_client = redis.Redis(
-                host=settings.redisdb.host,
-                port=settings.redisdb.port,
-                decode_responses=True,
-                username=settings.redisdb.username or "default",
-                password=settings.redisdb.password,
-                db=redis_db_index,
-                ssl=settings.redisdb.ssl,
-            )
+        
+        self.redis_client = redis.Redis(
+            host=settings.redisdb.host,
+            port=settings.redisdb.port,
+            decode_responses=True,
+            username="default",
+            password=settings.redisdb.password,
+        )
         
         self.llm = LLMService()
         

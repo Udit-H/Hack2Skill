@@ -121,7 +121,9 @@ class Orchestrator:
                               and shelter.user_consent_to_share)
         
         if has_legal_drafts or has_shelter_consent:
-            if drafting is None or drafting.workflow_status != DraftingWorkflowStatus.COMPLETED:
+            if drafting is None or drafting.workflow_status not in (
+                DraftingWorkflowStatus.COMPLETED, DraftingWorkflowStatus.FAILED
+            ):
                 session.active_agent = AgentType.DRAFTING
                 return
 

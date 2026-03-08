@@ -85,7 +85,7 @@ class DraftingAgent:
         # Initialize drafting state
         if not session.drafting:
             session.drafting = DraftingAgentState()
-        # Guard: if already completed, don't re-generate
+        # Guard: if already completed OR failed, don't re-generate (prevents infinite loop)
         if session.drafting.workflow_status == DraftingWorkflowStatus.COMPLETED and session.drafting.generated_drafts:
             logging.info("Drafting already completed — skipping re-generation.")
             draft_list = "\n".join([
@@ -96,6 +96,14 @@ class DraftingAgent:
                 action_type=AgentActionType.SWITCH_AGENT,
                 next_active_agent=AgentType.COMPLETED,
                 reply_message=f"Your documents are ready:\n\n{draft_list}",
+            )
+        if session.drafting.workflow_status == DraftingWorkflowStatus.FAILED:
+            logging.warning("Drafting previously failed — not retrying.")
+            error_summary = "; ".join(session.drafting.errors) if session.drafting.errors else "PDF generation failed"
+            return AgentResponse(
+                action_type=AgentActionType.SWITCH_AGENT,
+                next_active_agent=AgentType.COMPLETED,
+                reply_message=f"⚠️ Document generation encountered errors: {error_summary}\n\nPlease ensure the server has WeasyPrint dependencies installed, then try again.",
             )
         session.drafting.workflow_status = DraftingWorkflowStatus.GENERATING
         generated = []

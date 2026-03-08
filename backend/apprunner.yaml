@@ -4,13 +4,14 @@ runtime: python3
 build:
   commands:
     pre-build:
-      - python -m pip install --upgrade pip
+      - yum install -y pango cairo gdk-pixbuf2 libffi
+      - python3 -m pip install --upgrade pip
     build:
-      - pip install -r backend/requirements.txt
+      - pip install -r requirements.txt
 
 run:
   runtime-version: 3.11
-  command: uvicorn --app-dir backend main:app --host 0.0.0.0 --port 8080
+  command: uvicorn main:app --host 0.0.0.0 --port 8080
   network:
     port: 8080
     env: PORT

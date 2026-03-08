@@ -103,12 +103,13 @@ app.add_exception_handler(
     )
 )
 
-# CORS Configuration (improved for production and local dev)
-cors_origins = os.getenv("CORS_ORIGINS", "http://localhost:5173,http://127.0.0.1:5173").split(",")
+# CORS Configuration (allow all origins)
+print("🌐 CORS enabled for all origins (*)")
+
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=cors_origins,  # Configurable via environment variable
-    allow_credentials=True,
+    allow_origins=["*"],  # Allow all origins
+    allow_credentials=False,  # Must be False when using allow_origins=["*"]
     allow_methods=["GET", "POST", "PUT", "DELETE", "OPTIONS"],
     allow_headers=["*"],
     max_age=3600,  # Cache preflight requests for 1 hour

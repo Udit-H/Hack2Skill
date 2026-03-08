@@ -4,6 +4,7 @@ import redis
 import boto3
 # from mem0 import MemoryClient
 import jinja2
+from botocore.exceptions import ClientError
 
 from config.config import Settings
 from config.config import get_settings
@@ -22,14 +23,32 @@ class MemoryManager:
     def __init__(self, session_id: str = None):
         settings = Settings()
         self.session_id = session_id
-        
-        self.redis_client = redis.Redis(
-            host=settings.redisdb.host,
-            port=settings.redisdb.port,
-            decode_responses=True,
-            username="default",
-            password=settings.redisdb.password,
-        )
+        self.memory_backend = os.getenv("MEMORY_BACKEND", "dynamodb").strip().lower()
+
+        self.redis_client = None
+        self.dynamodb_table = None
+
+        if self.memory_backend == "redis":
+            redis_kwargs = {
+                "host": settings.redisdb.host,
+                "port": settings.redisdb.port,
+                "decode_responses": True,
+                "password": settings.redisdb.password,
+                "ssl": settings.redisdb.ssl,
+            }
+            if settings.redisdb.username:
+                redis_kwargs["username"] = settings.redisdb.username
+
+            self.redis_client = redis.Redis(**redis_kwargs)
+        else:
+            table_name = os.getenv("DYNAMODB_CHAT_TABLE", "sahayak-chat-messages")
+            dynamodb = boto3.resource(
+                "dynamodb",
+                region_name=settings.llm.aws_region,
+                aws_access_key_id=settings.llm.aws_access_key_id,
+                aws_secret_access_key=settings.llm.aws_secret_access_key,
+            )
+            self.dynamodb_table = dynamodb.Table(table_name)
         
         self.llm = LLMService()
         
@@ -43,6 +62,9 @@ class MemoryManager:
         Adds turns to Redis instantly (0.001s latency).
         Fires off summarization in the background if threshold met.
         """
+        if self.memory_backend != "redis":
+            return
+
         # 1. Push to Redis (Fast)
         self.redis_client.lpush(self.working_memory_key, f"AI: {ai_message}")
         self.redis_client.lpush(self.working_memory_key, f"User: {user_message}")
@@ -60,13 +82,17 @@ class MemoryManager:
         """
         Returns Anthropic-compliant XML tagged memory.
         """
-        working_memory = self._get_working_memory()
-        redis_summary = self.redis_client.get(self.episodic_memory_key) or "No previous context. This is the start of the conversation."
+        if self.memory_backend == "redis":
+            working_memory = self._get_working_memory()
+            episodic_summary = self.redis_client.get(self.episodic_memory_key) or "No previous context. This is the start of the conversation."
+        else:
+            working_memory = self._get_working_memory_dynamodb()
+            episodic_summary = "No previous context. This is the start of the conversation."
 
         # XML boundaries prevent the LLM from confusing memory with instructions
         return f"""
 <long_term_summary>
-{redis_summary}
+{episodic_summary}
 </long_term_summary>
 
 <recent_chat_history>
@@ -77,11 +103,43 @@ class MemoryManager:
     def _get_working_memory(self) -> str:
         history = self.redis_client.lrange(self.working_memory_key, 0, -1)
         return "\n".join(reversed(history))
+
+    def _get_working_memory_dynamodb(self) -> str:
+        if not self.dynamodb_table:
+            return ""
+
+        try:
+            response = self.dynamodb_table.query(
+                KeyConditionExpression=boto3.dynamodb.conditions.Key("session_id").eq(self.session_id),
+                Limit=12,
+                ScanIndexForward=False,
+            )
+            items = response.get("Items", [])
+            items.reverse()
+
+            lines = []
+            for item in items:
+                role = (item.get("role") or "assistant").strip().lower()
+                prefix = "User" if role == "user" else "AI"
+                content = item.get("content", "")
+                if content:
+                    lines.append(f"{prefix}: {content}")
+
+            return "\n".join(lines)
+        except ClientError as e:
+            print(f"[Memory] DynamoDB memory read error: {e.response['Error']['Message']}")
+            return ""
+        except Exception as e:
+            print(f"[Memory] Unexpected DynamoDB memory error: {e}")
+            return ""
     
     async def _async_trigger_summary(self):
         """
         Runs asynchronously so the Orchestrator doesn't freeze.
         """
+        if self.memory_backend != "redis":
+            return
+
         print(f"\n[Background Task] Triggering L2 Summarization for {self.session_id}...")
         
         full_history = self._get_working_memory()

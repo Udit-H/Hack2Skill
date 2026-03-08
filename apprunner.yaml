@@ -4,7 +4,6 @@ runtime: python3
 build:
   commands:
     pre-build:
-      - yum install -y cairo-devel pkgconfig
       - python3 -m pip install --upgrade pip
     build:
       - python3 -m pip install -r backend/requirements.txt

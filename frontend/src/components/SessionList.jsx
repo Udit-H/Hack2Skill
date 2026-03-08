@@ -1,10 +1,16 @@
 import { useState, useEffect } from 'react';
 import { listUserSessions } from '../utils/api';
 
-export default function SessionList({ userId, currentSessionId, onSelectSession, onNewChat }) {
+export default function SessionList({
+    userId,
+    currentSessionId,
+    onSelectSession,
+    onNewChat,
+    isOpen,
+    onClose,
+}) {
     const [sessions, setSessions] = useState([]);
     const [isLoading, setIsLoading] = useState(true);
-    const [isOpen, setIsOpen] = useState(false);
 
     useEffect(() => {
         if (userId && isOpen) {
@@ -14,19 +20,16 @@ export default function SessionList({ userId, currentSessionId, onSelectSession,
 
     const loadSessions = async () => {
         if (!userId) {
-            console.error('❌ No userId available for session list');
             setIsLoading(false);
             return;
         }
-        
+
         try {
-            console.log('📡 Loading sessions for user:', userId);
             setIsLoading(true);
             const data = await listUserSessions(userId);
-            console.log('✅ Sessions loaded:', data.sessions);
             setSessions(data.sessions || []);
         } catch (err) {
-            console.error('❌ Failed to load sessions:', err);
+            console.error('Failed to load sessions:', err);
             setSessions([]);
         } finally {
             setIsLoading(false);
@@ -49,90 +52,76 @@ export default function SessionList({ userId, currentSessionId, onSelectSession,
     };
 
     return (
-        <>
+        <aside className={`right-sidebar ${isOpen ? 'open' : ''}`}>
+            {/* Header */}
+            <div className="right-sidebar-header">
+                <h3>Your Conversations</h3>
+                <button onClick={onClose} className="right-sidebar-close" title="Close">
+                    ✕
+                </button>
+            </div>
+
+            {/* New Chat Button */}
             <button
-                onClick={() => setIsOpen(!isOpen)}
-                className="session-list-toggle"
-                title="View all chats"
+                onClick={() => {
+                    onNewChat();
+                    onClose();
+                }}
+                className="btn-new-chat"
             >
-                💬 Chats {sessions.length > 0 ? `(${sessions.length})` : ''}
+                ➕ New Chat
             </button>
 
-            {isOpen && (
-                <div className="session-list-overlay" onClick={() => setIsOpen(false)}>
-                    <div className="session-list-panel" onClick={(e) => e.stopPropagation()}>
-                        <div className="session-list-header">
-                            <h3>Your Conversations</h3>
-                            <button
-                                onClick={() => setIsOpen(false)}
-                                className="session-list-close"
-                            >
-                                ✕
-                            </button>
+            {/* Session List */}
+            <div className="right-sidebar-content">
+                {!userId ? (
+                    <div className="session-list-empty">
+                        ⚠️ Sign in to view saved chats
+                    </div>
+                ) : isLoading ? (
+                    <div className="session-list-loading">
+                        <div className="spinner"></div>
+                        Loading conversations...
+                    </div>
+                ) : sessions.length === 0 ? (
+                    <div className="session-list-empty">
+                        <div style={{ fontSize: '2rem', marginBottom: 'var(--space-4)' }}>💬</div>
+                        <div style={{ fontWeight: 500, marginBottom: 'var(--space-2)' }}>
+                            No conversations yet
                         </div>
-
-                        <button
-                            onClick={() => {
-                                onNewChat();
-                                setIsOpen(false);
-                            }}
-                            className="btn-new-chat"
-                        >
-                            ➕ New Chat
-                        </button>
-
-                        <div className="session-list-content">
-                            {!userId ? (
-                                <div className="session-list-empty">
-                                    ⚠️ User authentication required to view saved chats
-                                </div>
-                            ) : isLoading ? (
-                                <div className="session-list-loading">
-                                    <div className="spinner"></div>
-                                    Loading your conversations...
-                                </div>
-                            ) : sessions.length === 0 ? (
-                                <div className="session-list-empty">
-                                    <div style={{ fontSize: '2rem', marginBottom: 'var(--space-4)' }}>💬</div>
-                                    <div style={{ fontWeight: 500, marginBottom: 'var(--space-2)' }}>No conversations yet</div>
-                                    <div style={{ fontSize: 'var(--font-size-xs)', opacity: 0.7 }}>
-                                        Start a new chat and it will appear here
-                                    </div>
-                                </div>
-                            ) : (
-                                sessions.map((session) => (
-                                    <div
-                                        key={session.session_id}
-                                        className={`session-item ${
-                                            session.session_id === currentSessionId
-                                                ? 'active'
-                                                : ''
-                                        }`}
-                                        onClick={() => {
-                                            if (session.session_id !== currentSessionId) {
-                                                onSelectSession(session.session_id);
-                                                setIsOpen(false);
-                                            }
-                                        }}
-                                    >
-                                        <div className="session-item-preview">
-                                            {session.last_message}
-                                        </div>
-                                        <div className="session-item-meta">
-                                            <span className="session-item-time">
-                                                {formatTimestamp(session.last_timestamp)}
-                                            </span>
-                                            <span className="session-item-count">
-                                                {session.message_count} messages
-                                            </span>
-                                        </div>
-                                    </div>
-                                ))
-                            )}
+                        <div style={{ fontSize: 'var(--font-size-xs)', opacity: 0.7 }}>
+                            Start chatting and your history will appear here
                         </div>
                     </div>
-                </div>
-            )}
-        </>
+                ) : (
+                    sessions.map((session) => (
+                        <div
+                            key={session.session_id}
+                            className={`session-item ${
+                                session.session_id === currentSessionId ? 'active' : ''
+                            }`}
+                            onClick={() => {
+                                if (session.session_id !== currentSessionId) {
+                                    onSelectSession(session.session_id);
+                                    onClose();
+                                }
+                            }}
+                        >
+                            <div className="session-item-preview">
+                                {session.last_message}
+                            </div>
+                            <div className="session-item-meta">
+                                <span className="session-item-time">
+                                    {formatTimestamp(session.last_timestamp)}
+                                </span>
+                                <span className="session-item-count">
+                                    {session.message_count} msgs
+                                </span>
+                            </div>
+                        </div>
+                    ))
+                )}
+            </div>
+        </aside>
     );
 }

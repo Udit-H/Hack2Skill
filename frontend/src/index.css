@@ -895,6 +895,11 @@ body {
   .message {
     max-width: 92%;
   }
+
+  .right-sidebar {
+    width: 85vw;
+    min-width: unset;
+  }
 }
 
 @media (min-width: 769px) {
@@ -930,7 +935,7 @@ body {
   to { opacity: 0; pointer-events: none; }
 }
 
-/* --- Session List --- */
+/* --- Session List (Right Sidebar) --- */
 .session-list-toggle {
   padding: var(--space-2) var(--space-4);
   background: var(--bg-secondary);
@@ -949,47 +954,44 @@ body {
   box-shadow: var(--shadow-glow);
 }
 
-.session-list-overlay {
-  position: fixed;
-  inset: 0;
-  background: rgba(0, 0, 0, 0.7);
-  backdrop-filter: blur(4px);
-  z-index: 500;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  animation: fade-in 0.2s ease;
-}
-
-.session-list-panel {
-  width: 90%;
-  max-width: 500px;
-  max-height: 80vh;
+/* Right sidebar panel */
+.right-sidebar {
+  width: 320px;
+  min-width: 320px;
   background: var(--bg-secondary);
-  border: 1px solid var(--border-light);
-  border-radius: var(--radius-xl);
-  box-shadow: var(--shadow-lg);
+  border-left: 1px solid var(--border-subtle);
   display: flex;
   flex-direction: column;
-  animation: slide-up 0.3s ease;
+  transform: translateX(100%);
+  transition: transform var(--transition-normal);
+  position: fixed;
+  right: 0;
+  top: 0;
+  bottom: 0;
+  z-index: 50;
 }
 
-.session-list-header {
+.right-sidebar.open {
+  transform: translateX(0);
+}
+
+.right-sidebar-header {
   display: flex;
   align-items: center;
   justify-content: space-between;
   padding: var(--space-6);
   border-bottom: 1px solid var(--border-subtle);
+  flex-shrink: 0;
 }
 
-.session-list-header h3 {
+.right-sidebar-header h3 {
   margin: 0;
-  font-size: var(--font-size-xl);
+  font-size: var(--font-size-lg);
   color: var(--text-primary);
   font-weight: 600;
 }
 
-.session-list-close {
+.right-sidebar-close {
   background: none;
   border: none;
   color: var(--text-muted);
@@ -1000,12 +1002,12 @@ body {
   transition: color var(--transition-fast);
 }
 
-.session-list-close:hover {
+.right-sidebar-close:hover {
   color: var(--text-primary);
 }
 
-.btn-new-chat {
-  margin: var(--space-6) var(--space-6) 0;
+.right-sidebar .btn-new-chat {
+  margin: var(--space-4) var(--space-4) 0;
   padding: var(--space-3) var(--space-4);
   background: linear-gradient(135deg, var(--primary-600), var(--primary-700));
   border: none;
@@ -1021,15 +1023,24 @@ body {
   justify-content: center;
 }
 
-.btn-new-chat:hover {
+.right-sidebar .btn-new-chat:hover {
   background: linear-gradient(135deg, var(--primary-500), var(--primary-600));
   box-shadow: var(--shadow-glow);
 }
 
-.session-list-content {
+.right-sidebar-content {
   flex: 1;
   overflow-y: auto;
-  padding: var(--space-4) var(--space-6) var(--space-6);
+  padding: var(--space-4);
+}
+
+/* Overlay behind right sidebar on mobile */
+.right-sidebar-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.5);
+  z-index: 40;
+  animation: fade-in 0.2s ease;
 }
 
 .session-list-loading,

@@ -2,10 +2,11 @@
 Sahayak Form Drafting Agent
 ----------------------------
 Generates legal PDFs from data collected by Legal/Shelter agents.
-Uses xhtml2pdf (pure Python, no native deps) for HTML→PDF rendering.
+Uses fpdf2 (pure Python, zero native deps) for HTML→PDF rendering.
 """
 
 import os
+import re
 import tempfile
 import logging
 from datetime import datetime
@@ -21,8 +22,8 @@ from services.draft_storage_service import DraftStorageService
 logging.basicConfig(level=logging.INFO)
 
 PDF_GENERATION_ERROR_MESSAGE = (
-    "PDF generation dependency (xhtml2pdf) is not available. "
-    "Install it with: pip install xhtml2pdf"
+    "PDF generation dependency (fpdf2) is not available. "
+    "Install it with: pip install fpdf2"
 )
 
 # Map DraftType → Jinja2 HTML template filename
@@ -104,6 +105,23 @@ class DraftingAgent:
                 next_active_agent=AgentType.COMPLETED,
                 reply_message=f"⚠️ Document generation encountered errors: {error_summary}\n\nPlease try again or contact support.",
             )
+        # === CRASH GUARD: wraps entire generation in try/except ===
+        # Even if something totally unexpected happens, we ALWAYS set
+        # workflow_status to FAILED so the orchestrator never re-enters.
+        try:
+            return await self._do_generate(session)
+        except Exception as exc:
+            logging.exception(f"Drafting agent crashed: {exc}")
+            session.drafting.workflow_status = DraftingWorkflowStatus.FAILED
+            session.drafting.errors = [str(exc)]
+            return AgentResponse(
+                action_type=AgentActionType.SWITCH_AGENT,
+                next_active_agent=AgentType.COMPLETED,
+                reply_message=f"⚠️ Document generation failed unexpectedly: {str(exc)}",
+            )
+
+    async def _do_generate(self, session: SessionState) -> AgentResponse:
+        """Inner generation logic — called by process_turn inside crash guard."""
         session.drafting.workflow_status = DraftingWorkflowStatus.GENERATING
         generated = []
         errors = []
@@ -194,13 +212,13 @@ class DraftingAgent:
         return response
 
     # ---------------------------------------------------------------
-    # PDF Rendering (xhtml2pdf)
+    # PDF Rendering (fpdf2 — pure Python, zero native deps)
     # ---------------------------------------------------------------
 
     async def _render_legal_draft(
         self, session: SessionState, payload: LegalDraftPayload
     ) -> GeneratedDraft:
-        """Render a single legal draft via Jinja2 → xhtml2pdf → PDF."""
+        """Render a single legal draft via Jinja2 → fpdf2 → PDF."""
         template_file = TEMPLATE_MAP.get(payload.draft_type)
         if not template_file:
             raise ValueError(f"No template for draft type: {payload.draft_type.value}")
@@ -279,23 +297,50 @@ class DraftingAgent:
     # Helpers
     # ---------------------------------------------------------------
 
+    @staticmethod
+    def _sanitize_html(html: str) -> str:
+        """Convert Jinja2 HTML output to the subset fpdf2.write_html() supports."""
+        # Remove document wrapper tags
+        html = re.sub(r'<!DOCTYPE[^>]*>', '', html)
+        html = re.sub(r'<head>.*?</head>', '', html, flags=re.DOTALL)
+        for tag in ('html', 'body'):
+            html = re.sub(rf'</?{tag}[^>]*>', '', html)
+        # Semantic tag conversions
+        html = html.replace('<strong>', '<b>').replace('</strong>', '</b>')
+        html = html.replace('<em>', '<i>').replace('</em>', '</i>')
+        # Strip CSS-based attributes (fpdf2 ignores them)
+        html = re.sub(r'\s+style="[^"]*"', '', html)
+        html = re.sub(r'\s+class="[^"]*"', '', html)
+        html = re.sub(r'\s+id="[^"]*"', '', html)
+        # Convert divs to paragraphs (fpdf2 understands <p> not <div>)
+        html = re.sub(r'<div[^>]*>', '<p>', html)
+        html = html.replace('</div>', '</p>')
+        # Remove xhtml2pdf-specific page tags
+        html = re.sub(r'<pdf:[^>]*/?>\s*', '', html)
+        # Unicode → ASCII fallbacks (fpdf2 core fonts are latin-1)
+        html = html.replace('\u2014', '--').replace('\u2013', '-')
+        html = html.replace('\u2018', "'").replace('\u2019', "'")
+        html = html.replace('\u201c', '"').replace('\u201d', '"')
+        html = html.replace('\u2026', '...').replace('\u20b9', 'Rs.')
+        # Collapse excessive breaks
+        html = re.sub(r'(<br\s*/?>){3,}', '<br><br>', html)
+        return html.strip()
+
     def _write_pdf(self, html_content: str, output_path: str) -> None:
-        """Render HTML to PDF via xhtml2pdf (pure Python, no native deps)."""
+        """Render HTML to PDF via fpdf2 (pure Python, zero native deps)."""
         try:
-            from xhtml2pdf import pisa
+            from fpdf import FPDF
         except ImportError as exc:
             raise RuntimeError(PDF_GENERATION_ERROR_MESSAGE) from exc
 
-        with open(output_path, "wb") as f:
-            result = pisa.CreatePDF(
-                src=html_content,
-                dest=f,
-                encoding="utf-8",
-            )
-            if result.err:
-                raise RuntimeError(
-                    f"xhtml2pdf conversion failed with {result.err} error(s)"
-                )
+        clean_html = self._sanitize_html(html_content)
+
+        pdf = FPDF(orientation='P', unit='mm', format='A4')
+        pdf.set_auto_page_break(auto=True, margin=25)
+        pdf.add_page()
+        pdf.set_font('Helvetica', size=12)
+        pdf.write_html(clean_html)
+        pdf.output(output_path)
 
     def _build_template_context(
         self, session: SessionState, payload: LegalDraftPayload

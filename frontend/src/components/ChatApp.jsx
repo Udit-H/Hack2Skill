@@ -1,4 +1,4 @@
-import { useCallback } from 'react';
+import { useCallback, useState } from 'react';
 import { useAuth } from '../hooks/useAuth.jsx';
 import { useLanguage } from '../hooks/useLanguage.jsx';
 import { getTranslation } from '../utils/translations.js';
@@ -15,6 +15,7 @@ export default function ChatApp() {
   const { user, logout } = useAuth();
   const { language, setLanguage } = useLanguage();
   const navigate = useNavigate();
+  const [rightSidebarOpen, setRightSidebarOpen] = useState(false);
   const { 
     messages, 
     sessionId, 
@@ -89,12 +90,14 @@ export default function ChatApp() {
           </div>
 
           <div className="chat-header-actions">
-            <SessionList
-              userId={userId}
-              currentSessionId={sessionId}
-              onSelectSession={handleSelectSession}
-              onNewChat={handleNewChat}
-            />
+            {/* Toggle button for the right sidebar */}
+            <button
+              onClick={() => setRightSidebarOpen((prev) => !prev)}
+              className="session-list-toggle"
+              title="View past chats"
+            >
+              💬 Chats
+            </button>
 
             <select
               className="lang-selector"
@@ -137,6 +140,24 @@ export default function ChatApp() {
           isLoading={isLoading || !sessionId}
         />
       </main>
+
+      {/* Right sidebar — past chats */}
+      <SessionList
+        userId={userId}
+        currentSessionId={sessionId}
+        onSelectSession={handleSelectSession}
+        onNewChat={handleNewChat}
+        isOpen={rightSidebarOpen}
+        onClose={() => setRightSidebarOpen(false)}
+      />
+
+      {/* Overlay to close sidebar on mobile */}
+      {rightSidebarOpen && (
+        <div
+          className="right-sidebar-overlay"
+          onClick={() => setRightSidebarOpen(false)}
+        />
+      )}
     </div>
   );
 }

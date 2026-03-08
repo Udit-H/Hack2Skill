@@ -63,6 +63,17 @@ class LegalDraftPayload(BaseModel):
     draft_body_summary: str = Field(description="JSON or Text mapping for the specific legal form.")
 
 class LegalAgentState(BaseModel):
+    """State managed by the Legal Agent. extracted_doc_data and retrieved_legal_context
+    are excluded from the JSON schema so the LLM never tries to output them —
+    they're managed by code (OCR endpoint / RAG service)."""
+    
+    model_config = {
+        "json_schema_extra": lambda schema: [
+            schema.get("properties", {}).pop(k, None)
+            for k in ["extracted_doc_data", "retrieved_legal_context"]
+        ]
+    }
+
     internal_plan: list[str] = Field(
         default_factory=list,
         description="MANDATORY FIRST STEP: Before any decision, list your reasoning. "
@@ -70,8 +81,10 @@ class LegalAgentState(BaseModel):
     )
     
     workflow_status: WorkflowStatus = WorkflowStatus.AWAITING_DOCS
-    extracted_doc_data: Optional[str] = Field(None, description="Raw OCR text.")
-    retrieved_legal_context: Optional[str] = Field(None, description="Laws from RAG knowledge base.")
+    
+    # These are DATA fields managed by code, NOT by the LLM.
+    extracted_doc_data: Optional[str] = Field(None, exclude=True)
+    retrieved_legal_context: Optional[str] = Field(None, exclude=True)
     
     next_question_for_user: Optional[str] = Field(None)
     user_consent_police: Optional[bool] = Field(None)

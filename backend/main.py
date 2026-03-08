@@ -432,7 +432,37 @@ async def upload_document(
         logger.info(f"✅ Stored OCR text on session.legal.extracted_doc_data ({len(ocr_text)} chars)")
 
     # -------------------------------------------------------------------------
-    # STEP 3: Build the user message to send to the agent
+    # STEP 3: Generate a document summary via a SEPARATE plain-text LLM call
+    # The structured-output agent can't reliably summarize (it outputs JSON),
+    # so we summarize first and prepend it to the reply.
+    # -------------------------------------------------------------------------
+    doc_summary = None
+    if ocr_text:
+        try:
+            from services.llm_service import LLMService
+            summary_llm = LLMService()
+            text_for_summary = ocr_text[:3000]  # first 3000 chars is plenty for a summary
+            doc_summary = await summary_llm.create_completion(
+                messages=[
+                    {"role": "system", "content": (
+                        "You are a legal document analyst. The user has uploaded a document. "
+                        "Summarize it in 3-5 sentences: what type of document it is, "
+                        "the key parties involved, important dates, addresses, amounts, "
+                        "and any critical terms or clauses. Be specific — use actual names, "
+                        "dates, and numbers from the text. Do NOT ask the user anything."
+                    )},
+                    {"role": "user", "content": f"Here is the extracted text from the uploaded document:\n\n{text_for_summary}"}
+                ],
+                temperature=0.3,
+                max_tokens=500,
+            )
+            logger.info(f"📄 DOC SUMMARY generated ({len(doc_summary)} chars): {doc_summary[:150]}...")
+        except Exception as e:
+            logger.error(f"⚠️ Doc summary LLM call failed: {e}", exc_info=True)
+            doc_summary = None
+
+    # -------------------------------------------------------------------------
+    # STEP 4: Build the user message to send to the agent
     # Include extracted text so the LLM MUST acknowledge it
     # -------------------------------------------------------------------------
     if ocr_text:
@@ -442,7 +472,7 @@ async def upload_document(
         user_message = (
             f"I am uploading my document: {file.filename}\n\n"
             f"--- EXTRACTED DOCUMENT TEXT ---\n{text_preview}\n--- END OF EXTRACTED TEXT ---\n\n"
-            f"Please summarize what this document says and tell me what information you still need."
+            f"Please acknowledge the document and tell me what information you still need."
         )
     elif ocr_error:
         user_message = (
@@ -464,17 +494,22 @@ async def upload_document(
 
         logger.info(f"📄 AGENT REPLY (first 200 chars): {reply[:200] if reply else 'None'}...")
 
-        # If OCR succeeded but agent reply doesn't mention document content,
-        # prepend extraction summary so user knows it worked
-        if ocr_text:
-            doc_keywords = ["document", "agreement", "extracted", "uploaded", "can see",
-                            "rental", "contract", "notice", "i've read", "i can see",
-                            "this appears", "this is a", "the document"]
-            if not any(kw in reply.lower() for kw in doc_keywords):
-                reply = (
-                    f"📄 I've successfully extracted text from **{file.filename}** "
-                    f"({len(ocr_text):,} characters). I'm now analyzing the contents.\n\n{reply}"
-                )
+        # -----------------------------------------------------------------
+        # STEP 5: Always prepend the document summary if OCR succeeded
+        # Don't rely on the agent to summarize — it returns structured JSON
+        # -----------------------------------------------------------------
+        if doc_summary and ocr_text:
+            reply = (
+                f"📄 **Document Summary** — *{file.filename}* ({len(ocr_text):,} characters extracted)\n\n"
+                f"{doc_summary}\n\n---\n\n{reply}"
+            )
+        elif ocr_text and not doc_summary:
+            # Summary LLM call failed, but OCR worked — give a basic notice
+            reply = (
+                f"📄 I've extracted text from **{file.filename}** "
+                f"({len(ocr_text):,} characters). Here are the first few lines:\n\n"
+                f"> {ocr_text[:400].strip()}\n\n---\n\n{reply}"
+            )
 
         # If OCR failed entirely, warn the user
         if ocr_error and "extraction" not in reply.lower():
@@ -494,6 +529,7 @@ async def upload_document(
             "ocr_preview": (ocr_text[:300] + "...") if ocr_text and len(ocr_text) > 300 else ocr_text,
             "ocr_length": len(ocr_text) if ocr_text else 0,
             "ocr_error": ocr_error,
+            "doc_summary": doc_summary,
             "agent_info": {
                 "activeAgent": state.active_agent.value,
                 "workflowStatus": _get_workflow_status(state),

@@ -134,6 +134,17 @@ class LegalAgent:
             # Fallback to mock response when API fails
             updated_state = current_state
 
+        # ── CRITICAL: Preserve data fields the LLM cannot output ──
+        # The LLM returns a new LegalAgentState but extracted_doc_data and
+        # retrieved_legal_context are excluded from the schema (too large).
+        # We must carry them forward from the previous state.
+        if current_state.extracted_doc_data and not updated_state.extracted_doc_data:
+            updated_state.extracted_doc_data = current_state.extracted_doc_data
+            logger.info(f"   Preserved extracted_doc_data ({len(current_state.extracted_doc_data)} chars)")
+        if current_state.retrieved_legal_context and not updated_state.retrieved_legal_context:
+            updated_state.retrieved_legal_context = current_state.retrieved_legal_context
+            logger.info(f"   Preserved retrieved_legal_context ({len(current_state.retrieved_legal_context)} chars)")
+
         session.legal = updated_state
 
         # CODE-LEVEL FALLBACK: If LLM set READY_TO_DRAFT but forgot to populate drafts_to_generate,

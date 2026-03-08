@@ -2,7 +2,7 @@
 Sahayak Form Drafting Agent
 ----------------------------
 Generates legal PDFs from data collected by Legal/Shelter agents.
-Hybrid approach: WeasyPrint for legal drafts, pypdf for official forms.
+Uses xhtml2pdf (pure Python, no native deps) for HTML→PDF rendering.
 """
 
 import os
@@ -20,10 +20,9 @@ from services.draft_storage_service import DraftStorageService
 
 logging.basicConfig(level=logging.INFO)
 
-WEASYPRINT_IMPORT_ERROR_MESSAGE = (
-    "PDF generation dependency is not available. WeasyPrint requires native system "
-    "libraries (glib/pango/cairo). Install those libraries for your OS and ensure "
-    "their DLLs are on PATH, then restart the server."
+PDF_GENERATION_ERROR_MESSAGE = (
+    "PDF generation dependency (xhtml2pdf) is not available. "
+    "Install it with: pip install xhtml2pdf"
 )
 
 # Map DraftType → Jinja2 HTML template filename
@@ -103,7 +102,7 @@ class DraftingAgent:
             return AgentResponse(
                 action_type=AgentActionType.SWITCH_AGENT,
                 next_active_agent=AgentType.COMPLETED,
-                reply_message=f"⚠️ Document generation encountered errors: {error_summary}\n\nPlease ensure the server has WeasyPrint dependencies installed, then try again.",
+                reply_message=f"⚠️ Document generation encountered errors: {error_summary}\n\nPlease try again or contact support.",
             )
         session.drafting.workflow_status = DraftingWorkflowStatus.GENERATING
         generated = []
@@ -195,13 +194,13 @@ class DraftingAgent:
         return response
 
     # ---------------------------------------------------------------
-    # WeasyPrint Rendering
+    # PDF Rendering (xhtml2pdf)
     # ---------------------------------------------------------------
 
     async def _render_legal_draft(
         self, session: SessionState, payload: LegalDraftPayload
     ) -> GeneratedDraft:
-        """Render a single legal draft via Jinja2 → WeasyPrint → PDF."""
+        """Render a single legal draft via Jinja2 → xhtml2pdf → PDF."""
         template_file = TEMPLATE_MAP.get(payload.draft_type)
         if not template_file:
             raise ValueError(f"No template for draft type: {payload.draft_type.value}")
@@ -281,23 +280,22 @@ class DraftingAgent:
     # ---------------------------------------------------------------
 
     def _write_pdf(self, html_content: str, output_path: str) -> None:
-        """Render HTML to PDF with lazy WeasyPrint import.
-
-        We keep the import inside this method so the API can boot even on
-        environments that don't have WeasyPrint native runtime deps yet.
-        """
+        """Render HTML to PDF via xhtml2pdf (pure Python, no native deps)."""
         try:
-            from weasyprint import HTML
-        except Exception as exc:
-            raise RuntimeError(WEASYPRINT_IMPORT_ERROR_MESSAGE) from exc
+            from xhtml2pdf import pisa
+        except ImportError as exc:
+            raise RuntimeError(PDF_GENERATION_ERROR_MESSAGE) from exc
 
-        try:
-            HTML(
-                string=html_content,
-                base_url=os.path.join(os.path.dirname(__file__), '..', 'templates')
-            ).write_pdf(output_path)
-        except OSError as exc:
-            raise RuntimeError(WEASYPRINT_IMPORT_ERROR_MESSAGE) from exc
+        with open(output_path, "wb") as f:
+            result = pisa.CreatePDF(
+                src=html_content,
+                dest=f,
+                encoding="utf-8",
+            )
+            if result.err:
+                raise RuntimeError(
+                    f"xhtml2pdf conversion failed with {result.err} error(s)"
+                )
 
     def _build_template_context(
         self, session: SessionState, payload: LegalDraftPayload

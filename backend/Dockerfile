@@ -1,20 +1,14 @@
 # ── Sahayak Backend ──────────────────────────────────────
 # Image-based deployment for AWS App Runner.
-# Uses python:3.11-slim + WeasyPrint system dependencies.
+# Minimal system deps: only libcairo2 for xhtml2pdf.
 # ─────────────────────────────────────────────────────────
 
 FROM python:3.11-slim
 
-# ── 1. System deps for WeasyPrint (pango/cairo/gdk-pixbuf) ──
+# ── 1. Minimal system dep: cairo for pycairo (xhtml2pdf dependency) ──
 RUN apt-get update && apt-get install -y --no-install-recommends \
-    libpango-1.0-0 \
-    libpangoft2-1.0-0 \
-    libpangocairo-1.0-0 \
-    libgdk-pixbuf-2.0-0 \
-    libcairo2 \
-    libffi-dev \
-    libglib2.0-0 \
-    fonts-dejavu-core \
+    libcairo2-dev \
+    pkg-config \
     && rm -rf /var/lib/apt/lists/*
 
 # ── 2. Working directory ──

@@ -30,8 +30,8 @@ pygeohash>=1.2.0
 aiohttp==3.13.3
 aiofiles==25.1.0
 
-# PDF Generation
-weasyprint>=62.0
+# PDF Generation (pure Python — no native deps needed)
+xhtml2pdf>=0.2.16
 pypdf>=5.0
 
 # Text Matching (for shelter preference scoring)

@@ -1,15 +1,20 @@
 /* ============================================
    Sahayak — Court Document Base CSS
    A4, 2.5cm margins, 1.5 line spacing
+   Compatible with xhtml2pdf (pisa)
    ============================================ */
 
 @page {
     size: A4;
     margin: 2.5cm;
-    @bottom-center {
-        content: "Page " counter(page) " of " counter(pages);
-        font-size: 9pt;
-        color: #666;
+    margin-bottom: 3cm;
+
+    @frame footer {
+        -pdf-frame-content: page-footer;
+        bottom: 0.5cm;
+        margin-left: 2.5cm;
+        margin-right: 2.5cm;
+        height: 1cm;
     }
 }
 

@@ -11,15 +11,6 @@ import tempfile
 import asyncio
 from contextlib import asynccontextmanager
 
-# ─── MSYS2 DLL Setup for WeasyPrint on Windows ──────────────────
-# Must happen BEFORE any weasyprint imports
-msys_path = r"C:\msys64\ucrt64\bin"
-if os.path.exists(msys_path):
-    os.add_dll_directory(msys_path)
-    print(f"✅ MSYS2 DLL directory added: {msys_path}")
-else:
-    print(f"⚠️  MSYS2 path not found — WebAssembly PDF generation may fail on Windows.")
-
 from fastapi import FastAPI, UploadFile, File, Form, HTTPException, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse, JSONResponse, RedirectResponse

@@ -4,7 +4,7 @@ runtime: python3
 build:
   commands:
     pre-build:
-      - yum install -y pango cairo gdk-pixbuf2 libffi
+      - yum install -y cairo-devel pkgconfig
       - python3 -m pip install --upgrade pip
     build:
       - pip install -r requirements.txt
